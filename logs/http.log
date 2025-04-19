@@ -1,0 +1,2 @@
+{"level":"info","message":{"data":null,"headers":{"Accept":"application/json, text/plain, */*","Content-Type":"application/json"},"method":"GET","type":"request","url":"http://localhost:5171/api/User/GetUserIdByEmail"},"timestamp":"2025-04-19T13:05:18.153Z"}
+{"level":"info","message":{"method":"GET","responseTime":1062,"status":200,"type":"response","url":"http://localhost:5171/api/User/GetUserIdByEmail"},"timestamp":"2025-04-19T13:05:19.214Z"}

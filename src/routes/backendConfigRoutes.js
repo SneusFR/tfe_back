@@ -21,5 +21,6 @@ r.post('/', backendConfigValidation.validateBackendConfig, asyncHandler(c.create
 r.get('/:id', validateMongoId('id'), asyncHandler(c.detail));
 r.put('/:id', validateMongoId('id'), backendConfigValidation.validateBackendConfig, asyncHandler(c.update));
 r.delete('/:id', validateMongoId('id'), asyncHandler(c.remove));
+r.patch('/:id/active', validateMongoId('id'), asyncHandler(c.setActive));
 
 export default r;

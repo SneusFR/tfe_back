@@ -132,3 +132,37 @@ export const deleteConfig = async (id, userId) => {
   const cfg = await getConfig(id, userId, 'internal');
   await cfg.deleteOne();
 };
+
+/**
+ * Définit une configuration comme active et désactive toutes les autres
+ * @param {String} id - ID de la configuration à activer
+ * @param {String} userId - ID de l'utilisateur
+ * @returns {Promise<Object>} - Configuration activée
+ */
+export const setActiveConfig = async (id, userId) => {
+  // Désactiver toutes les configurations de l'utilisateur
+  await BackendConfig.updateMany(
+    { owner: userId },
+    { $set: { isActive: false } }
+  );
+  
+  // Activer la configuration spécifiée
+  await BackendConfig.updateOne(
+    { _id: id, owner: userId },
+    { $set: { isActive: true } }
+  );
+  
+  // Retourner la configuration mise à jour
+  return getConfig(id, userId);
+};
+
+/**
+ * Récupère la configuration active d'un utilisateur
+ * @param {String} userId - ID de l'utilisateur
+ * @returns {Promise<Object>} - Configuration active
+ */
+export const getActiveConfig = async (userId) => {
+  const cfg = await BackendConfig.findOne({ owner: userId, isActive: true });
+  if (!cfg) throw new NotFoundError('NO_ACTIVE_CONFIG');
+  return cfg;
+};

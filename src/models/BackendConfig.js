@@ -86,9 +86,16 @@ const BackendConfigSchema = new Schema({
   compression: { type: Boolean, default: false },
   proxy: { host: String, port: String },
   tlsSkipVerify: { type: Boolean, default: false },
+  isActive: { type: Boolean, default: false },
 }, {
   timestamps: true
 });
+
+/* ----------- Garantir l'unicité de la config active par utilisateur ---------- */
+BackendConfigSchema.index(
+  { owner: 1, isActive: 1 },
+  { unique: true, partialFilterExpression: { isActive: true } }
+);
 
 /* ----------- (dé)chiffrer avant save / après find ---------- */
 BackendConfigSchema.pre('save', function(next) {

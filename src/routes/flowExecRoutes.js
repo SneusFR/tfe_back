@@ -28,8 +28,19 @@ router.post('/execute',
     }
     // Or fetch from database if ID is provided
     else if (backendConfigId) {
-      const cfg = await cfgSvc.getConfig(backendConfigId, req.user.id);
-      FlowEngine.setBackendConfig(cfg.toJSON());
+      // Récupérer le document mongoose "interne" avec les secrets déchiffrés
+      const cfgDoc = await cfgSvc.getConfig(backendConfigId, req.user.id, 'internal');
+      FlowEngine.setBackendConfig(cfgDoc.toJSON());
+    }
+    // Or use the active config if no specific config is provided
+    else {
+      try {
+        // getActiveConfig retourne déjà le document Mongoose complet
+        const cfgDoc = await cfgSvc.getActiveConfig(req.user.id);
+        FlowEngine.setBackendConfig(cfgDoc.toJSON());
+      } catch (error) {
+        console.warn('No active backend config found, continuing without config');
+      }
     }
     
     // Execute the flow
