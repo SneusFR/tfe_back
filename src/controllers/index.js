@@ -5,6 +5,7 @@ import * as conditionController from './conditionController.js';
 import * as taskController from './taskController.js';
 import * as emailController from './emailController.js';
 import * as attachmentController from './attachmentController.js';
+import * as backendConfigController from './backendConfigController.js';
 
 export {
   userController,
@@ -13,5 +14,6 @@ export {
   conditionController,
   taskController,
   emailController,
-  attachmentController
+  attachmentController,
+  backendConfigController
 };

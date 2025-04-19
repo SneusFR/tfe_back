@@ -6,6 +6,7 @@ import conditionRoutes from './conditionRoutes.js';
 import taskRoutes from './taskRoutes.js';
 import emailRoutes from './emailRoutes.js';
 import attachmentRoutes from './attachmentRoutes.js';
+import backendConfigRoutes from './backendConfigRoutes.js';
 
 export {
   authRoutes,
@@ -15,5 +16,6 @@ export {
   conditionRoutes,
   taskRoutes,
   emailRoutes,
-  attachmentRoutes
+  attachmentRoutes,
+  backendConfigRoutes
 };

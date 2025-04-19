@@ -5,6 +5,7 @@ import Condition from './Condition.js';
 import Task from './Task.js';
 import Email from './Email.js';
 import Attachment from './Attachment.js';
+import BackendConfig from './BackendConfig.js';
 
 export {
   User,
@@ -13,5 +14,6 @@ export {
   Condition,
   Task,
   Email,
-  Attachment
+  Attachment,
+  BackendConfig
 };
