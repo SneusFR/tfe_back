@@ -6,7 +6,10 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon src/index.js",
+    "dev:debug": "cross-env LOG_LEVEL=debug nodemon src/index.js",
+    "dev:trace": "cross-env LOG_LEVEL=silly nodemon src/index.js",
     "start": "node src/index.js",
+    "start:debug": "cross-env LOG_LEVEL=debug node src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -18,6 +21,7 @@
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "cross-env": "^7.0.3",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "express-rate-limit": "^7.5.0",

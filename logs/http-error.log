@@ -1,0 +1,1 @@
+{"level":"error","message":{"error":{"code":"ERR_BAD_REQUEST","data":"","message":"Request failed with status code 404","status":404},"method":"GET","responseTime":246,"type":"error","url":"http://localhost:5171/api/user/profile/TEST"},"timestamp":"2025-04-19T20:09:54.242Z"}

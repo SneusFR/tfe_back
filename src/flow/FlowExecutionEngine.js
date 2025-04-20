@@ -4,6 +4,7 @@
 import axios from 'axios';
 import { http } from './httpLogger.js';
 import { createWorker } from 'tesseract.js';
+import flowLog from './flowLogger.js';
 
 // Create an axios instance
 const api = axios.create({
@@ -17,12 +18,43 @@ class FlowExecutionEngine {
     this.executionContext = new Map(); // Stores data during execution
     this.baseApiUrl = 'http://localhost:5171'; // Backend API base URL
     this.backendConfig = null;
+    
+    flowLog.info(`Flow Execution Engine initialized`, {
+      baseApiUrl: this.baseApiUrl,
+      timestamp: new Date().toISOString()
+    });
   }
 
   // Set the diagram data (nodes and edges)
   setDiagram(nodes, edges) {
     this.nodes = nodes;
     this.edges = edges;
+    
+    flowLog.info(`Diagram set with ${nodes.length} nodes and ${edges.length} edges`, {
+      nodeTypes: this.countNodeTypes(),
+      edgeCount: edges.length,
+      hasStartingNode: this.hasStartingNode()
+    });
+  }
+  
+  // Count the number of each type of node in the diagram
+  countNodeTypes() {
+    const typeCounts = {};
+    this.nodes.forEach(node => {
+      if (!typeCounts[node.type]) {
+        typeCounts[node.type] = 0;
+      }
+      typeCounts[node.type]++;
+    });
+    return typeCounts;
+  }
+  
+  // Check if the diagram has a starting node
+  hasStartingNode() {
+    return this.nodes.some(node => 
+      node.type === 'conditionNode' && 
+      node.data.isStartingPoint === true
+    );
   }
 
   // Find the starting point node for a given task
@@ -37,31 +69,61 @@ class FlowExecutionEngine {
     
     // If no specific starting node is found, log an error but don't fall back to any starting point
     if (!startingNode) {
-      console.error(`❌ [FLOW ENGINE] No matching starting node found for task type "${task.type}". Tasks must have a corresponding starting point with the same return value.`);
+      flowLog.error(`No matching starting node found for task type "${task.type}"`, new Error('No matching starting node'), {
+        taskType: task.type,
+        availableStartingNodes: this.nodes
+          .filter(node => node.type === 'conditionNode' && node.data.isStartingPoint === true)
+          .map(node => ({
+            id: node.id,
+            returnText: node.data.returnText
+          }))
+      });
       return null;
     }
     
-    console.log(`✅ [FLOW ENGINE] Found starting node with return value "${startingNode.data.returnText}" matching task type "${task.type}"`);
+    flowLog.info(`Found starting node with return value "${startingNode.data.returnText}" matching task type "${task.type}"`, {
+      nodeId: startingNode.id,
+      nodeType: startingNode.type,
+      returnText: startingNode.data.returnText,
+      taskType: task.type
+    });
     return startingNode;
   }
 
   // Execute a flow for a given task
   async executeFlow(task) {
-    console.log(`🔄 [FLOW ENGINE] Starting execution for task: ${task.id} - ${task.type}`);
+    flowLog.startExecution(task.id, task.type);
+    flowLog.info(`Task details`, { 
+      taskId: task.id, 
+      taskType: task.type, 
+      sourceId: task.sourceId,
+      senderEmail: task.senderEmail,
+      recipientEmail: task.recipientEmail,
+      hasAttachments: task.attachments ? task.attachments.length > 0 : false
+    });
     
     // Find the starting node that matches the task type or description
     const startingNode = this.findStartingNode(task);
     if (!startingNode) {
-      console.error(`❌ [FLOW ENGINE] No starting node found for task: ${task.type}`);
+      flowLog.error(`No starting node found for task type: ${task.type}`, new Error('No starting node found'));
       return { success: false, error: 'No starting node found for this task type' };
     }
     
-    console.log(`✅ [FLOW ENGINE] Found starting node: ${startingNode.id} with condition: ${startingNode.data.conditionText}`);
-    console.log(`📧 [FLOW ENGINE] Task email ID: ${task.sourceId}`);
+    flowLog.info(`Found starting node`, {
+      nodeId: startingNode.id,
+      conditionText: startingNode.data.conditionText,
+      returnText: startingNode.data.returnText,
+      isStartingPoint: startingNode.data.isStartingPoint
+    });
+    
+    if (task.sourceId) {
+      flowLog.info(`Task email ID: ${task.sourceId}`);
+    }
     
     // Initialize execution context with task data
     this.executionContext.clear();
     this.executionContext.set('task', task);
+    flowLog.contextUpdate('task', task);
     
     // Populate starting node attributes with task data
     if (startingNode.data.emailAttributes) {
@@ -74,7 +136,7 @@ class FlowExecutionEngine {
         // Add other mappings as needed
       };
       
-      console.log(`📧 [FLOW ENGINE] Mapped email ID to execution context: ${emailAttributes.email_id}`);
+      flowLog.info(`Mapped email ID to execution context: ${emailAttributes.email_id}`);
       
       // Handle attachments if they exist in the task
       if (task.attachments && Array.isArray(task.attachments)) {
@@ -87,9 +149,15 @@ class FlowExecutionEngine {
           cid: attachment.cid
         }));
         
-        console.log(`📎 [FLOW ENGINE] Found ${emailAttributes.attachments.length} attachments in task:`);
-        emailAttributes.attachments.forEach((attachment, index) => {
-          console.log(`  - Attachment ${index + 1}: ID=${attachment.id}, Name=${attachment.name}`);
+        flowLog.info(`Found ${emailAttributes.attachments.length} attachments in task`, {
+          attachmentCount: emailAttributes.attachments.length,
+          attachments: emailAttributes.attachments.map(att => ({
+            id: att.id,
+            name: att.name,
+            size: att.size,
+            extension: att.extension,
+            mime: att.mime
+          }))
         });
       }
       
@@ -103,14 +171,14 @@ class FlowExecutionEngine {
         // Store the first attachment ID as the main attachment_id attribute
         if (emailAttributes.attachments[0].id) {
           this.executionContext.set('attr-attachment_id', emailAttributes.attachments[0].id);
-          console.log(`✅ [FLOW ENGINE] Stored first attachment ID ${emailAttributes.attachments[0].id} in execution context as attr-attachment_id`);
+          flowLog.debug(`Stored first attachment ID ${emailAttributes.attachments[0].id} in execution context as attr-attachment_id`);
         }
         
         // Store each attachment ID individually
         emailAttributes.attachments.forEach((attachment, index) => {
           if (attachment.id) {
             this.executionContext.set(`attr-attachment-${index}`, attachment.id);
-            console.log(`✅ [FLOW ENGINE] Stored attachment ID ${attachment.id} in execution context as attr-attachment-${index}`);
+            flowLog.debug(`Stored attachment ID ${attachment.id} in execution context as attr-attachment-${index}`);
           }
         });
       }
@@ -119,18 +187,17 @@ class FlowExecutionEngine {
     // Execute the flow starting from the starting node
     try {
       const result = await this.executeNode(startingNode);
-      console.log(`✅ [FLOW ENGINE] Flow execution completed successfully`);
+      flowLog.endExecution(task.id, true, result);
       return { success: true, result };
     } catch (error) {
-      console.error(`❌ [FLOW ENGINE] Error executing flow:`, error);
+      flowLog.endExecution(task.id, false, { error: error.message });
       return { success: false, error: error.message };
     }
   }
 
   // Execute a single node and follow its outgoing edges
   async executeNode(node) {
-    console.trace("executeApiNode called for node:", node.id);
-    console.log(`🔄 [FLOW ENGINE] Executing node: ${node.id} (${node.type})`);
+    flowLog.startNodeExecution(node.id, node.type);
     
     let outputData;
     
@@ -161,23 +228,28 @@ class FlowExecutionEngine {
         outputData = await this.executeConsoleLogNode(node);
         break;
       default:
-        console.warn(`⚠️ [FLOW ENGINE] Unknown node type: ${node.type}`);
+        flowLog.warn(`Unknown node type: ${node.type}`);
         outputData = null;
     }
     
     // Store the node's output in the execution context
     if (outputData !== undefined) {
       this.executionContext.set(`output-${node.id}`, outputData);
+      flowLog.contextUpdate(`output-${node.id}`, outputData);
       
       // If the node has a specific output handle, store the data for that handle
       if (node.type === 'apiNode' && outputData) {
         // Store the complete response
         this.executionContext.set(`${node.id}-output`, outputData);
         
-        // Store specific parts of the response for the new output handles
+      // Store specific parts of the response for the new output handles
         this.executionContext.set(`${node.id}-output-response`, outputData);
         this.executionContext.set(`${node.id}-output-body`, outputData); // For API responses, the data is usually the body
         this.executionContext.set(`${node.id}-output-status`, 200); // Default to 200 for mock responses
+        
+        flowLog.contextUpdate(`${node.id}-output-response`, outputData);
+        flowLog.contextUpdate(`${node.id}-output-body`, outputData);
+        flowLog.contextUpdate(`${node.id}-output-status`, 200);
       }
     }
     
@@ -189,7 +261,7 @@ class FlowExecutionEngine {
         const sourceData = this.getDataForHandle(node, edge.sourceHandle);
         if (sourceData !== undefined) {
           this.executionContext.set(edge.targetHandle, sourceData);
-          console.log(`🔄 [FLOW ENGINE] Passing data from ${node.id}.${edge.sourceHandle} to ${targetNode.id}.${edge.targetHandle}`);
+          flowLog.dataTransfer(node.id, edge.sourceHandle, targetNode.id, edge.targetHandle, sourceData);
         }
       }
     }
@@ -205,13 +277,18 @@ class FlowExecutionEngine {
     for (const edge of executionEdges) {
       const targetNode = this.nodes.find(n => n.id === edge.target);
       if (targetNode) {
-        console.log(`🔄 [FLOW ENGINE] Following execution link to node: ${targetNode.id}`);
+      flowLog.info(`Following execution link to node: ${targetNode.id}`, {
+        sourceNodeId: node.id,
+        targetNodeId: targetNode.id,
+        edgeType: 'execution'
+      });
         // Execute the target node
         const result = await this.executeNode(targetNode);
         results.push(result);
       }
     }
     
+    flowLog.endNodeExecution(node.id, node.type, outputData);
     return results.length > 0 ? results : outputData;
   }
 
@@ -222,7 +299,7 @@ class FlowExecutionEngine {
       // Special case for individual attachment handles
       if (handleId.match(/^attr-attachment-\d+$/)) {
         const attachmentId = this.executionContext.get(handleId);
-        console.log(`🔄 [FLOW ENGINE] Getting attachment ID from handle ${handleId}: ${attachmentId}`);
+        flowLog.debug(`Getting attachment ID from handle ${handleId}: ${attachmentId}`);
         return attachmentId;
       }
       return this.executionContext.get(handleId);
@@ -265,7 +342,11 @@ class FlowExecutionEngine {
 
   // Execute a condition node
   async executeConditionNode(node) {
-    console.log(`🔄 [FLOW ENGINE] Executing condition node: ${node.id}`);
+    flowLog.debug(`Executing condition node: ${node.id}`, {
+      conditionText: node.data.conditionText,
+      isStartingPoint: node.data.isStartingPoint,
+      returnText: node.data.returnText
+    });
     
     // For starting points, we've already populated the attributes
     if (node.data.isStartingPoint) {
@@ -279,7 +360,13 @@ class FlowExecutionEngine {
 
   // Execute an API node
   async executeApiNode(node) {
-    console.log(`🔄 [FLOW ENGINE] Executing API node: ${node.id} - ${node.data.method} ${node.data.path}`);
+    flowLog.info(`Executing API node: ${node.id} - ${node.data.method} ${node.data.path}`, {
+      nodeId: node.id,
+      method: node.data.method,
+      path: node.data.path,
+      hasParameters: node.data.parameters ? node.data.parameters.length > 0 : false,
+      hasRequestBody: !!node.data.requestBody
+    });
     
     try {
       // Build the request configuration
@@ -315,10 +402,10 @@ class FlowExecutionEngine {
             
             // If we have a value, replace the parameter in the URL
             if (paramValue !== undefined) {
-              console.log(`🔄 [FLOW ENGINE] Replacing path parameter {${param.name}} with value: ${paramValue}`);
+              flowLog.debug(`Replacing path parameter {${param.name}} with value: ${paramValue}`);
               url = url.replace(`{${param.name}}`, paramValue);
             } else {
-              console.warn(`⚠️ [FLOW ENGINE] No value found for path parameter: ${param.name}`);
+              flowLog.warn(`No value found for path parameter: ${param.name}`);
             }
           }
         }
@@ -360,7 +447,7 @@ class FlowExecutionEngine {
             
             // If we have a value, add it to the query parameters
             if (paramValue !== undefined) {
-              console.log(`🔄 [FLOW ENGINE] Adding query parameter ${param.name}=${paramValue}`);
+              flowLog.debug(`Adding query parameter ${param.name}=${paramValue}`);
               queryParams[param.name] = paramValue;
             }
           }
@@ -394,9 +481,9 @@ class FlowExecutionEngine {
               if (sourceNode.type === 'textNode' && typeof requestBody === 'string') {
                 try {
                   requestBody = JSON.parse(requestBody);
-                  console.log(`🔄 [FLOW ENGINE] Parsed JSON body from text node`);
+                  flowLog.debug(`Parsed JSON body from text node`);
                 } catch (e) {
-                  console.warn(`⚠️ [FLOW ENGINE] Failed to parse text node content as JSON, using as string`);
+                  flowLog.warn(`Failed to parse text node content as JSON, using as string`);
                 }
               }
             }
@@ -404,24 +491,27 @@ class FlowExecutionEngine {
         }
         
         if (requestBody !== undefined) {
-          console.log(`🔄 [FLOW ENGINE] Using request body:`, requestBody);
+          flowLog.debug(`Using request body for ${method.toUpperCase()} request`, { requestBody });
         } else {
-          console.warn(`⚠️ [FLOW ENGINE] No request body found for ${method.toUpperCase()} request`);
+          flowLog.warn(`No request body found for ${method.toUpperCase()} request`);
         }
       }
       
       // Execute the API request
-      console.log(`🔄 [FLOW ENGINE] Making API request: ${method.toUpperCase()} ${url}`);
-      
-      // Déterminer quelle instance axios utiliser
-      const axiosInstance = url.startsWith(this.backendConfig?.baseUrl) ? api : http;
-      
       // Préparer les en-têtes par défaut
       const cfg = this.backendConfig ?? {};
       const hdrs = {
         'Content-Type': 'application/json',
         ...(cfg.defaultHeaders?.reduce((o, h) => ({ ...o, [h.key]: h.value }), {}))
       };
+      
+      flowLog.apiRequest(node.id, method.toUpperCase(), url, hdrs, requestBody);
+      
+      const startTime = Date.now();
+      
+      // Déterminer quelle instance axios utiliser
+      const axiosInstance = url.startsWith(this.backendConfig?.baseUrl) ? api : http;
+      
       
       // Appliquer l'authentification selon le type configuré
       if (cfg.authType && cfg.authType !== 'none') {
@@ -461,7 +551,7 @@ class FlowExecutionEngine {
               const token = await getOauth2Token(cfg);
               hdrs.Authorization = `Bearer ${token}`;
             } catch (error) {
-              console.error(`❌ [FLOW ENGINE] OAuth2 token retrieval failed:`, error);
+              flowLog.error(`OAuth2 token retrieval failed`, error);
               // Continuer sans token en cas d'échec
             }
             break;
@@ -489,7 +579,8 @@ class FlowExecutionEngine {
         decompress: cfg.compression
       });
       
-      console.log(`✅ [FLOW ENGINE] API request successful: ${response.status}`);
+      const responseTime = Date.now() - startTime;
+      flowLog.apiResponse(node.id, method.toUpperCase(), url, response.status, response.data, responseTime);
       
       // Store specific parts of the response in the execution context
       this.executionContext.set(`${node.id}-output-response`, response.data);
@@ -498,26 +589,31 @@ class FlowExecutionEngine {
       
       return response.data;
     } catch (error) {
-      console.error(`❌ [FLOW ENGINE] API request failed:`, error);
+      const responseTime = Date.now() - startTime;
+      flowLog.apiError(node.id, method.toUpperCase(), url, error, responseTime);
       throw new Error(`API request failed: ${error.message}`);
     }
   }
 
   // Execute a text node
   async executeTextNode(node) {
-    console.log(`🔄 [FLOW ENGINE] Executing text node: ${node.id}`);
+    flowLog.debug(`Executing text node: ${node.id}`, {
+      text: node.data.text ? 
+        (node.data.text.length > 100 ? node.data.text.substring(0, 100) + '...' : node.data.text) : 
+        null
+    });
     return node.data.text;
   }
 
   // Execute an int node
   async executeIntNode(node) {
-    console.log(`🔄 [FLOW ENGINE] Executing int node: ${node.id}`);
+    flowLog.debug(`Executing int node: ${node.id}`, { value: node.data.value });
     return node.data.value;
   }
 
   // Execute a sending mail node
   async executeSendingMailNode(node) {
-    console.log(`🔄 [FLOW ENGINE] Executing sending mail node: ${node.id}`);
+    flowLog.info(`Executing sending mail node: ${node.id}`);
     
     try {
       // Get email attributes from the node or from the execution context
@@ -540,8 +636,11 @@ class FlowExecutionEngine {
       const bcc = this.executionContext.get('attr-bcc') || emailAttributes.bcc;
       const custom_headers = this.executionContext.get('attr-custom_headers') || emailAttributes.custom_headers;
       
-      console.log (toEmail)
-      console.log(fromEmail)
+      flowLog.debug(`Email details`, {
+        toEmail,
+        fromEmail,
+        subject: subject ? (subject.length > 50 ? subject.substring(0, 50) + '...' : subject) : null
+      });
       // Format the email data according to Unipile API requirements
       const email = {
         account_id: account_id,
@@ -590,7 +689,16 @@ class FlowExecutionEngine {
         email.custom_headers = custom_headers;
       }
       
-      console.log(`📧 [FLOW ENGINE] Sending email via Unipile:`, email);
+      flowLog.info(`Sending email via Unipile`, {
+        to: email.to,
+        from: email.from,
+        subject: email.subject ? 
+          (email.subject.length > 50 ? email.subject.substring(0, 50) + '...' : email.subject) : 
+          null,
+        hasCC: email.cc && email.cc.length > 0,
+        hasBCC: email.bcc && email.bcc.length > 0,
+        hasCustomHeaders: email.custom_headers && email.custom_headers.length > 0
+      });
       
       // Make the API request to Unipile
       const unipileBaseUrl = process.env.UNIPILE_BASE_URL;
@@ -606,17 +714,19 @@ class FlowExecutionEngine {
         }
       });
       
-      console.log(`✅ [FLOW ENGINE] Email sent successfully:`, response.data);
+      flowLog.info(`Email sent successfully`, {
+        responseData: response.data
+      });
       return { sent: true, email: email, response: response.data };
     } catch (error) {
-      console.error(`❌ [FLOW ENGINE] Failed to send email:`, error);
+      flowLog.error(`Failed to send email`, error);
       return { sent: false, error: error.message };
     }
   }
   
   // Execute an email attachment node
   async executeEmailAttachmentNode(node) {
-    console.log(`🔄 [FLOW ENGINE] Executing email attachment node: ${node.id}`);
+    flowLog.info(`Executing email attachment node: ${node.id}`);
     
     try {
       // Get email attributes from the node or from the execution context
@@ -629,16 +739,16 @@ class FlowExecutionEngine {
       
       // Validate required parameters
       if (!email_id) {
-        console.error(`❌ [FLOW ENGINE] Missing required parameter: email_id`);
+        flowLog.error(`Missing required parameter: email_id`, new Error('Missing required parameter'));
         return { success: false, error: 'Missing required parameter: email_id' };
       }
       
       if (!attachment_id) {
-        console.error(`❌ [FLOW ENGINE] Missing required parameter: attachment_id`);
+        flowLog.error(`Missing required parameter: attachment_id`, new Error('Missing required parameter'));
         return { success: false, error: 'Missing required parameter: attachment_id' };
       }
       
-      console.log(`📧 [FLOW ENGINE] Retrieving email attachment via Unipile:`, {
+      flowLog.info(`Retrieving email attachment via Unipile`, {
         account_id,
         email_id,
         attachment_id
@@ -669,7 +779,10 @@ class FlowExecutionEngine {
         responseType: 'arraybuffer', // Get binary data instead of JSON
       });
       
-      console.log(`✅ [FLOW ENGINE] Email attachment retrieved successfully`);
+      flowLog.info(`Email attachment retrieved successfully`, {
+        contentType: response.headers['content-type'],
+        size: response.data.byteLength
+      });
       
       // Convert the ArrayBuffer to a base64 Data URL
       const bytes = new Uint8Array(response.data);
@@ -681,21 +794,24 @@ class FlowExecutionEngine {
       const contentType = response.headers['content-type'] || 'application/octet-stream';
       const dataUrl = `data:${contentType};base64,${base64String}`;
       
-      console.log(`✅ [FLOW ENGINE] Converted attachment to base64 Data URL`);
+      flowLog.debug(`Converted attachment to base64 Data URL`, {
+        contentType,
+        dataUrlLength: dataUrl.length
+      });
       
       // Store the data URL in the execution context for the output handle
       this.executionContext.set(`${node.id}-output-attachment`, dataUrl);
       
       return dataUrl;
     } catch (error) {
-      console.error(`❌ [FLOW ENGINE] Failed to retrieve email attachment:`, error);
+      flowLog.error(`Failed to retrieve email attachment`, error);
       return { success: false, error: error.message };
     }
   }
   
   // Execute an OCR node
   async executeOcrNode(node) {
-    console.log(`🔄 [FLOW ENGINE] Executing OCR node: ${node.id}`);
+    flowLog.info(`Executing OCR node: ${node.id}`);
     
     try {
       // Get OCR attributes from the node or from the execution context
@@ -709,11 +825,11 @@ class FlowExecutionEngine {
       
       // Validate required parameters
       if (!attachment_data) {
-        console.error(`❌ [FLOW ENGINE] Missing required parameter: attachment_data`);
+        flowLog.error(`Missing required parameter: attachment_data`, new Error('Missing required parameter'));
         return { success: false, error: 'Missing required parameter: attachment_data' };
       }
       
-      console.log(`🔄 [FLOW ENGINE] Processing image with OCR using Tesseract.js:`, {
+      flowLog.info(`Processing image with OCR using Tesseract.js`, {
         language,
         enhance_image,
         dataUrlProvided: attachment_data.startsWith('data:')
@@ -741,21 +857,25 @@ class FlowExecutionEngine {
         enhancedImage: enhance_image
       };
       
-      console.log(`✅ [FLOW ENGINE] OCR processing completed successfully`);
+      flowLog.info(`OCR processing completed successfully`, {
+        textLength: ocrResult.text ? ocrResult.text.length : 0,
+        confidence: ocrResult.confidence,
+        processingTimeMs: ocrResult.processingTimeMs
+      });
       
       // Store the OCR result in the execution context for the output handle
       this.executionContext.set(`${node.id}-output-text`, ocrResult.text);
       
       return ocrResult;
     } catch (error) {
-      console.error(`❌ [FLOW ENGINE] Failed to process image with OCR:`, error);
+      flowLog.error(`Failed to process image with OCR`, error);
       return { success: false, error: error.message };
     }
   }
   
   // Execute a console.log node
   async executeConsoleLogNode(node) {
-    console.log(`🔄 [FLOW ENGINE] Executing console.log node: ${node.id}`);
+    flowLog.info(`Executing console.log node: ${node.id}`);
     
     try {
       // Get the input value from the connected handle
@@ -763,16 +883,29 @@ class FlowExecutionEngine {
       
       // Log the input value to the console
       console.log(`📝 [CONSOLE.LOG NODE] Value:`, inputValue);
+      flowLog.info(`Console.log node output`, { value: inputValue });
       
       return { logged: true, value: inputValue };
     } catch (error) {
-      console.error(`❌ [FLOW ENGINE] Failed to execute console.log node:`, error);
+      flowLog.error(`Failed to execute console.log node`, error);
       return { logged: false, error: error.message };
     }
   }
 
   setBackendConfig(cfg) {
     this.backendConfig = cfg;
+    
+    if (cfg) {
+      flowLog.info(`Backend configuration set`, {
+        baseUrl: cfg.baseUrl,
+        authType: cfg.authType,
+        hasProxy: !!cfg.proxy?.host,
+        hasDefaultHeaders: cfg.defaultHeaders && cfg.defaultHeaders.length > 0,
+        timeout: cfg.timeout
+      });
+    } else {
+      flowLog.warn(`Backend configuration cleared or set to null`);
+    }
   }
 }
 
