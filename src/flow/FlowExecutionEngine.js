@@ -133,7 +133,12 @@ class FlowExecutionEngine {
         email_id: task.sourceId || startingNode.data.emailAttributes.email_id, // Map task sourceId to email_id
         fromEmail: task.senderEmail || startingNode.data.emailAttributes.fromEmail,
         toEmail: task.recipientEmail || startingNode.data.emailAttributes.toEmail,
-        // Add other mappings as needed
+        subject: task.subject || startingNode.data.emailAttributes.subject,
+        fromDisplayName: task.senderName || startingNode.data.emailAttributes.fromDisplayName,
+        toDisplayName: task.recipientName || startingNode.data.emailAttributes.toDisplayName,
+        content: task.body || startingNode.data.emailAttributes.content,
+        date: task.date || startingNode.data.emailAttributes.date,
+        attachment_id: task.attachmentId || startingNode.data.emailAttributes.attachment_id
       };
       
       flowLog.info(`Mapped email ID to execution context: ${emailAttributes.email_id}`);

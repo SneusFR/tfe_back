@@ -65,8 +65,14 @@ export const createTask = async (req, res, next) => {
       description, 
       source, 
       sourceId, 
+      subject,
       senderEmail, 
       recipientEmail, 
+      senderName,
+      recipientName,
+      body,
+      date,
+      attachmentId,
       attachments 
     } = req.body;
     
@@ -76,8 +82,14 @@ export const createTask = async (req, res, next) => {
       description,
       source: source || 'manual',
       sourceId,
+      subject,
       senderEmail,
       recipientEmail,
+      senderName,
+      recipientName,
+      body,
+      date,
+      attachmentId,
       attachments: attachments || []
     });
     
@@ -97,8 +109,14 @@ export const updateTask = async (req, res, next) => {
       type, 
       source, 
       sourceId, 
+      subject,
       senderEmail, 
       recipientEmail, 
+      senderName,
+      recipientName,
+      body,
+      date,
+      attachmentId,
       status, 
       attachments 
     } = req.body;
@@ -119,8 +137,14 @@ export const updateTask = async (req, res, next) => {
     if (type !== undefined) task.type = type;
     if (source !== undefined) task.source = source;
     if (sourceId !== undefined) task.sourceId = sourceId;
+    if (subject !== undefined) task.subject = subject;
     if (senderEmail !== undefined) task.senderEmail = senderEmail;
     if (recipientEmail !== undefined) task.recipientEmail = recipientEmail;
+    if (senderName !== undefined) task.senderName = senderName;
+    if (recipientName !== undefined) task.recipientName = recipientName;
+    if (body !== undefined) task.body = body;
+    if (date !== undefined) task.date = date;
+    if (attachmentId !== undefined) task.attachmentId = attachmentId;
     
     if (status && status !== task.status) {
       task.status = status;

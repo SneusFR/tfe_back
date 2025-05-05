@@ -135,6 +135,9 @@ export const validateTask = (req, res, next) => {
       throw new ValidationError('Source invalide', 'INVALID_TASK_SOURCE');
     }
     
+    // Récupérer les nouveaux champs (pas d'erreur bloquante : ils sont optionnels)
+    const { subject, senderName, recipientName, body, date, attachmentId } = req.body;
+    
     next();
   } catch (error) {
     next(error);

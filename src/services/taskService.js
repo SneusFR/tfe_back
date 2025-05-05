@@ -69,8 +69,14 @@ export const createTask = async (userId, taskData) => {
     description, 
     source, 
     sourceId, 
+    subject,
     senderEmail, 
     recipientEmail, 
+    senderName,
+    recipientName,
+    body,
+    date,
+    attachmentId,
     attachments 
   } = taskData;
   
@@ -84,8 +90,14 @@ export const createTask = async (userId, taskData) => {
     description,
     source: source || 'manual',
     sourceId,
+    subject,
     senderEmail,
     recipientEmail,
+    senderName,
+    recipientName,
+    body,
+    date,
+    attachmentId,
     attachments: attachments || []
   });
   
@@ -116,8 +128,14 @@ export const updateTask = async (taskId, updateData, userId) => {
     type, 
     source, 
     sourceId, 
+    subject,
     senderEmail, 
     recipientEmail, 
+    senderName,
+    recipientName,
+    body,
+    date,
+    attachmentId,
     status, 
     attachments 
   } = updateData;
@@ -127,8 +145,14 @@ export const updateTask = async (taskId, updateData, userId) => {
   if (type !== undefined) task.type = type;
   if (source !== undefined) task.source = source;
   if (sourceId !== undefined) task.sourceId = sourceId;
+  if (subject !== undefined) task.subject = subject;
   if (senderEmail !== undefined) task.senderEmail = senderEmail;
   if (recipientEmail !== undefined) task.recipientEmail = recipientEmail;
+  if (senderName !== undefined) task.senderName = senderName;
+  if (recipientName !== undefined) task.recipientName = recipientName;
+  if (body !== undefined) task.body = body;
+  if (date !== undefined) task.date = date;
+  if (attachmentId !== undefined) task.attachmentId = attachmentId;
   
   if (status && status !== task.status) {
     task.status = status;

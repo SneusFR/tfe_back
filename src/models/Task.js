@@ -8,8 +8,14 @@ const TaskSchema = new Schema({
   description:    { type: String, default: null },
   source:         { type: String, enum: Object.values(TASK_SOURCE), default: TASK_SOURCE.EMAIL },
   sourceId:       { type: String, default: null },
+  subject:        { type: String, default: null },
   senderEmail:    { type: String, default: null },
   recipientEmail: { type: String, default: null },
+  senderName:     { type: String, default: null },
+  recipientName:  { type: String, default: null },
+  body:           { type: String, default: null }, // contenu ou extrait
+  date:           { type: Date, default: null },
+  attachmentId:   { type: String, default: null }, // premier fichier
   status:         { type: String, enum: Object.values(TASK_STATUS), default: TASK_STATUS.PENDING },
   attachments:    [{
      _id: false,
