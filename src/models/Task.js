@@ -3,20 +3,22 @@ import { TASK_STATUS, TASK_SOURCE } from '../utils/constants.js';
 const { Schema } = mongoose;
 
 const TaskSchema = new Schema({
-  user:         { type: Schema.Types.ObjectId, ref: 'User', required: true },
-  type:         { type: String, required: true },
-  description:  { type: String },
-  source:       { type: String, enum: Object.values(TASK_SOURCE), default: TASK_SOURCE.EMAIL },
-  sourceId:     { type: String },
-  status:       { type: String, enum: Object.values(TASK_STATUS), default: TASK_STATUS.PENDING },
-  attachments:  [{
+  user:           { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  type:           { type: String, required: true },
+  description:    { type: String, default: null },
+  source:         { type: String, enum: Object.values(TASK_SOURCE), default: TASK_SOURCE.EMAIL },
+  sourceId:       { type: String, default: null },
+  senderEmail:    { type: String, default: null },
+  recipientEmail: { type: String, default: null },
+  status:         { type: String, enum: Object.values(TASK_STATUS), default: TASK_STATUS.PENDING },
+  attachments:    [{
      _id: false,
      id:         String,
      name:       String,
      mime:       String,
      size:       Number
   }],
-  completedAt:  { type: Date }
+  completedAt:    { type: Date, default: null }
 }, {
   timestamps: true
 });

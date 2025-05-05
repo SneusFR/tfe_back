@@ -60,7 +60,15 @@ export const getTaskById = async (req, res, next) => {
 // Créer une nouvelle tâche
 export const createTask = async (req, res, next) => {
   try {
-    const { type, description, source, sourceId, attachments } = req.body;
+    const { 
+      type, 
+      description, 
+      source, 
+      sourceId, 
+      senderEmail, 
+      recipientEmail, 
+      attachments 
+    } = req.body;
     
     const task = new Task({
       user: req.user.id,
@@ -68,6 +76,8 @@ export const createTask = async (req, res, next) => {
       description,
       source: source || 'manual',
       sourceId,
+      senderEmail,
+      recipientEmail,
       attachments: attachments || []
     });
     
@@ -82,7 +92,16 @@ export const createTask = async (req, res, next) => {
 // Mettre à jour une tâche
 export const updateTask = async (req, res, next) => {
   try {
-    const { description, status, attachments } = req.body;
+    const { 
+      description, 
+      type, 
+      source, 
+      sourceId, 
+      senderEmail, 
+      recipientEmail, 
+      status, 
+      attachments 
+    } = req.body;
     
     const task = await Task.findById(req.params.id);
     
@@ -95,7 +114,13 @@ export const updateTask = async (req, res, next) => {
       throw new AuthorizationError('Accès non autorisé', 'UNAUTHORIZED_ACCESS');
     }
     
-    task.description = description || task.description;
+    // Mise à jour des champs si fournis
+    if (description !== undefined) task.description = description;
+    if (type !== undefined) task.type = type;
+    if (source !== undefined) task.source = source;
+    if (sourceId !== undefined) task.sourceId = sourceId;
+    if (senderEmail !== undefined) task.senderEmail = senderEmail;
+    if (recipientEmail !== undefined) task.recipientEmail = recipientEmail;
     
     if (status && status !== task.status) {
       task.status = status;

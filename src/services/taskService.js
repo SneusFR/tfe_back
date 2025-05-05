@@ -64,7 +64,15 @@ export const getTaskById = async (taskId, userId) => {
  * @returns {Promise<Object>} - Tâche créée
  */
 export const createTask = async (userId, taskData) => {
-  const { type, description, source, sourceId, attachments } = taskData;
+  const { 
+    type, 
+    description, 
+    source, 
+    sourceId, 
+    senderEmail, 
+    recipientEmail, 
+    attachments 
+  } = taskData;
   
   if (!type) {
     throw new ValidationError('Le type de tâche est requis', 'MISSING_TASK_TYPE');
@@ -76,6 +84,8 @@ export const createTask = async (userId, taskData) => {
     description,
     source: source || 'manual',
     sourceId,
+    senderEmail,
+    recipientEmail,
     attachments: attachments || []
   });
   
@@ -101,11 +111,24 @@ export const updateTask = async (taskId, updateData, userId) => {
     throw new AuthorizationError('Accès non autorisé', 'UNAUTHORIZED_ACCESS');
   }
   
-  const { description, status, attachments } = updateData;
+  const { 
+    description, 
+    type, 
+    source, 
+    sourceId, 
+    senderEmail, 
+    recipientEmail, 
+    status, 
+    attachments 
+  } = updateData;
   
-  if (description) {
-    task.description = description;
-  }
+  // Mise à jour des champs si fournis
+  if (description !== undefined) task.description = description;
+  if (type !== undefined) task.type = type;
+  if (source !== undefined) task.source = source;
+  if (sourceId !== undefined) task.sourceId = sourceId;
+  if (senderEmail !== undefined) task.senderEmail = senderEmail;
+  if (recipientEmail !== undefined) task.recipientEmail = recipientEmail;
   
   if (status && status !== task.status) {
     task.status = status;
