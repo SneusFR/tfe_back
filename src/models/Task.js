@@ -4,6 +4,7 @@ const { Schema } = mongoose;
 
 const TaskSchema = new Schema({
   user:           { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  flow:           { type: Schema.Types.ObjectId, ref: 'Flow', required: true },
   type:           { type: String, required: true },
   description:    { type: String, default: null },
   source:         { type: String, enum: Object.values(TASK_SOURCE), default: TASK_SOURCE.EMAIL },
@@ -28,6 +29,9 @@ const TaskSchema = new Schema({
 }, {
   timestamps: true
 });
+
+// Index pour recherche rapide par flow
+TaskSchema.index({ flow: 1 });
 
 // Transformer _id en id pour le frontend
 TaskSchema.set('toJSON', {

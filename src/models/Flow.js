@@ -40,6 +40,23 @@ const FlowSchema = new Schema(
 );
 
 /* -------------------------------------------------------------------------- */
+/* Cascade delete pour les entités liées au flow                              */
+/* -------------------------------------------------------------------------- */
+FlowSchema.pre('deleteOne', { document: true }, async function() {
+  const flowId = this._id;
+  const mongoose = this.constructor.base;
+  
+  // Supprimer toutes les tâches liées à ce flow
+  await mongoose.model('Task').deleteMany({ flow: flowId });
+  
+  // Supprimer toutes les configurations backend liées à ce flow
+  await mongoose.model('BackendConfig').deleteMany({ flow: flowId });
+  
+  // Supprimer toutes les conditions liées à ce flow
+  await mongoose.model('Condition').deleteMany({ flow: flowId });
+});
+
+/* -------------------------------------------------------------------------- */
 /* Transformation JSON pour le front                                          */
 /* -------------------------------------------------------------------------- */
 FlowSchema.set('toJSON', {

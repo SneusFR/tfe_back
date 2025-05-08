@@ -3,24 +3,28 @@ import { conditionController } from '../controllers/index.js';
 import { authMiddleware, errorMiddleware, validationMiddleware } from '../middleware/index.js';
 import { Condition } from '../models/index.js';
 
-const router = express.Router();
-const { protect } = authMiddleware;
+const router = express.Router({ mergeParams: true }); // Pour accéder aux params de la route parent (flowId)
+const { protect, hasFlowAccess } = authMiddleware;
 const { asyncHandler, validateMongoId } = errorMiddleware;
 const { validateCondition, validatePagination } = validationMiddleware;
 
+// Appliquer le middleware hasFlowAccess à toutes les routes
+router.use(protect, hasFlowAccess('viewer'));
+
 /**
- * @route   GET /api/conditions
- * @desc    Récupérer toutes les conditions d'un utilisateur
- * @access  Private
+ * @route   GET /api/flow/:flowId/conditions
+ * @desc    Récupérer toutes les conditions d'un flow
+ * @access  Private (viewer+)
  */
-router.get('/', protect, validatePagination, asyncHandler(async (req, res, next) => {
+router.get('/', validatePagination, asyncHandler(async (req, res, next) => {
   try {
-    const conditions = await Condition.find({ owner: req.user.id })
+    const flowId = req.params.flowId;
+    const conditions = await Condition.find({ flow: flowId })
       .sort(req.pagination.sort)
       .skip(req.pagination.skip)
       .limit(req.pagination.limit);
     
-    const total = await Condition.countDocuments({ owner: req.user.id });
+    const total = await Condition.countDocuments({ flow: flowId });
     
     res.json({
       page: req.pagination.page,
@@ -35,46 +39,46 @@ router.get('/', protect, validatePagination, asyncHandler(async (req, res, next)
 }));
 
 /**
- * @route   GET /api/conditions/:id
+ * @route   GET /api/flow/:flowId/conditions/:id
  * @desc    Récupérer une condition par ID
- * @access  Private
+ * @access  Private (viewer+)
  */
-router.get('/:id', protect, validateMongoId('id'), asyncHandler(conditionController.getConditionById));
+router.get('/:id', validateMongoId('id'), asyncHandler(conditionController.getConditionById));
 
 /**
- * @route   POST /api/conditions
+ * @route   POST /api/flow/:flowId/conditions
  * @desc    Créer une nouvelle condition
- * @access  Private
+ * @access  Private (editor+)
  */
-router.post('/', protect, validateCondition, asyncHandler(conditionController.createCondition));
+router.post('/', hasFlowAccess('editor'), validateCondition, asyncHandler(conditionController.createCondition));
 
 /**
- * @route   PUT /api/conditions/:id
+ * @route   PUT /api/flow/:flowId/conditions/:id
  * @desc    Mettre à jour une condition
- * @access  Private
+ * @access  Private (editor+)
  */
-router.put('/:id', protect, validateMongoId('id'), validateCondition, asyncHandler(conditionController.updateCondition));
+router.put('/:id', hasFlowAccess('editor'), validateMongoId('id'), validateCondition, asyncHandler(conditionController.updateCondition));
 
 /**
- * @route   DELETE /api/conditions/:id
+ * @route   DELETE /api/flow/:flowId/conditions/:id
  * @desc    Supprimer une condition
- * @access  Private
+ * @access  Private (editor+)
  */
-router.delete('/:id', protect, validateMongoId('id'), asyncHandler(conditionController.deleteCondition));
+router.delete('/:id', hasFlowAccess('editor'), validateMongoId('id'), asyncHandler(conditionController.deleteCondition));
 
 /**
- * @route   POST /api/conditions/evaluate
+ * @route   POST /api/flow/:flowId/conditions/evaluate
  * @desc    Évaluer une condition
- * @access  Private
+ * @access  Private (viewer+)
  */
-router.post('/evaluate', protect, asyncHandler(conditionController.evaluateCondition));
+router.post('/evaluate', asyncHandler(conditionController.evaluateCondition));
 
 /**
- * @route   POST /api/conditions/validate
+ * @route   POST /api/flow/:flowId/conditions/validate
  * @desc    Valider une expression conditionnelle sans l'exécuter
- * @access  Private
+ * @access  Private (viewer+)
  */
-router.post('/validate', protect, asyncHandler(async (req, res) => {
+router.post('/validate', asyncHandler(async (req, res) => {
   const { expression } = req.body;
   
   if (!expression) {

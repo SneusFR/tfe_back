@@ -2,62 +2,54 @@ import express from 'express';
 import { taskController } from '../controllers/index.js';
 import { authMiddleware, errorMiddleware, validationMiddleware } from '../middleware/index.js';
 
-const router = express.Router();
-const { protect } = authMiddleware;
+const router = express.Router({ mergeParams: true }); // Pour accéder aux params de la route parent (flowId)
+const { protect, hasFlowAccess } = authMiddleware;
 const { asyncHandler, validateMongoId } = errorMiddleware;
 const { validateTask, validatePagination } = validationMiddleware;
 
-/**
- * @route   GET /api/tasks
- * @desc    Récupérer toutes les tâches d'un utilisateur
- * @access  Private
- */
-router.get('/', protect, validatePagination, asyncHandler(taskController.getTasks));
+// Appliquer le middleware hasFlowAccess à toutes les routes
+router.use(protect, hasFlowAccess('viewer'));
 
 /**
- * @route   GET /api/tasks/stats
- * @desc    Récupérer les statistiques des tâches d'un utilisateur
- * @access  Private
+ * @route   GET /api/flow/:flowId/tasks
+ * @desc    Récupérer toutes les tâches d'un flow
+ * @access  Private (viewer+)
  */
-router.get('/stats', protect, asyncHandler(async (req, res) => {
-  const { taskService } = await import('../services/index.js');
-  const stats = await taskService.getTaskStats(req.user.id);
-  res.json(stats);
-}));
+router.get('/', validatePagination, asyncHandler(taskController.getTasks));
 
 /**
- * @route   GET /api/tasks/:id
+ * @route   GET /api/flow/:flowId/tasks/:id
  * @desc    Récupérer une tâche par ID
- * @access  Private
+ * @access  Private (viewer+)
  */
-router.get('/:id', protect, validateMongoId('id'), asyncHandler(taskController.getTaskById));
+router.get('/:id', validateMongoId('id'), asyncHandler(taskController.getTaskById));
 
 /**
- * @route   POST /api/tasks
+ * @route   POST /api/flow/:flowId/tasks
  * @desc    Créer une nouvelle tâche
- * @access  Private
+ * @access  Private (editor+)
  */
-router.post('/', protect, validateTask, asyncHandler(taskController.createTask));
+router.post('/', hasFlowAccess('editor'), validateTask, asyncHandler(taskController.createTask));
 
 /**
- * @route   PUT /api/tasks/:id
+ * @route   PUT /api/flow/:flowId/tasks/:id
  * @desc    Mettre à jour une tâche
- * @access  Private
+ * @access  Private (editor+)
  */
-router.put('/:id', protect, validateMongoId('id'), validateTask, asyncHandler(taskController.updateTask));
+router.put('/:id', hasFlowAccess('editor'), validateMongoId('id'), validateTask, asyncHandler(taskController.updateTask));
 
 /**
- * @route   DELETE /api/tasks/:id
+ * @route   DELETE /api/flow/:flowId/tasks/:id
  * @desc    Supprimer une tâche
- * @access  Private
+ * @access  Private (editor+)
  */
-router.delete('/:id', protect, validateMongoId('id'), asyncHandler(taskController.deleteTask));
+router.delete('/:id', hasFlowAccess('editor'), validateMongoId('id'), asyncHandler(taskController.deleteTask));
 
 /**
- * @route   PUT /api/tasks/:id/complete
+ * @route   PUT /api/flow/:flowId/tasks/:id/complete
  * @desc    Marquer une tâche comme terminée
- * @access  Private
+ * @access  Private (editor+)
  */
-router.put('/:id/complete', protect, validateMongoId('id'), asyncHandler(taskController.completeTask));
+router.put('/:id/complete', hasFlowAccess('editor'), validateMongoId('id'), asyncHandler(taskController.completeTask));
 
 export default router;

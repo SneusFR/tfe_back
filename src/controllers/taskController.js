@@ -2,11 +2,12 @@ import { Task } from '../models/index.js';
 
 import { ValidationError, NotFoundError, AuthorizationError } from '../utils/AppError.js';
 
-// Récupérer toutes les tâches d'un utilisateur
+// Récupérer toutes les tâches d'un flow
 export const getTasks = async (req, res, next) => {
   try {
     const { status, type } = req.query;
-    const query = { user: req.user.id };
+    const flowId = req.params.flowId;
+    const query = { flow: flowId };
     
     // Filtrer par statut si spécifié
     if (status) {
@@ -40,16 +41,14 @@ export const getTasks = async (req, res, next) => {
 // Récupérer une tâche par ID
 export const getTaskById = async (req, res, next) => {
   try {
-    const task = await Task.findById(req.params.id);
+    const flowId = req.params.flowId;
+    const task = await Task.findOne({ _id: req.params.id, flow: flowId });
     
     if (!task) {
       throw new NotFoundError('Tâche non trouvée', 'TASK_NOT_FOUND');
     }
     
-    // Vérifier si l'utilisateur est autorisé à voir cette tâche
-    if (task.user.toString() !== req.user.id) {
-      throw new AuthorizationError('Accès non autorisé', 'UNAUTHORIZED_ACCESS');
-    }
+    // L'accès est déjà vérifié par le middleware hasFlowAccess
     
     res.json(task);
   } catch (error) {
@@ -60,6 +59,7 @@ export const getTaskById = async (req, res, next) => {
 // Créer une nouvelle tâche
 export const createTask = async (req, res, next) => {
   try {
+    const flowId = req.params.flowId;
     const { 
       type, 
       description, 
@@ -78,6 +78,7 @@ export const createTask = async (req, res, next) => {
     
     const task = new Task({
       user: req.user.id,
+      flow: flowId,
       type,
       description,
       source: source || 'manual',
@@ -104,6 +105,7 @@ export const createTask = async (req, res, next) => {
 // Mettre à jour une tâche
 export const updateTask = async (req, res, next) => {
   try {
+    const flowId = req.params.flowId;
     const { 
       description, 
       type, 
@@ -121,16 +123,13 @@ export const updateTask = async (req, res, next) => {
       attachments 
     } = req.body;
     
-    const task = await Task.findById(req.params.id);
+    const task = await Task.findOne({ _id: req.params.id, flow: flowId });
     
     if (!task) {
       throw new NotFoundError('Tâche non trouvée', 'TASK_NOT_FOUND');
     }
     
-    // Vérifier si l'utilisateur est autorisé à modifier cette tâche
-    if (task.user.toString() !== req.user.id) {
-      throw new AuthorizationError('Accès non autorisé', 'UNAUTHORIZED_ACCESS');
-    }
+    // L'accès est déjà vérifié par le middleware hasFlowAccess
     
     // Mise à jour des champs si fournis
     if (description !== undefined) task.description = description;
@@ -170,16 +169,14 @@ export const updateTask = async (req, res, next) => {
 // Supprimer une tâche
 export const deleteTask = async (req, res, next) => {
   try {
-    const task = await Task.findById(req.params.id);
+    const flowId = req.params.flowId;
+    const task = await Task.findOne({ _id: req.params.id, flow: flowId });
     
     if (!task) {
       throw new NotFoundError('Tâche non trouvée', 'TASK_NOT_FOUND');
     }
     
-    // Vérifier si l'utilisateur est autorisé à supprimer cette tâche
-    if (task.user.toString() !== req.user.id) {
-      throw new AuthorizationError('Accès non autorisé', 'UNAUTHORIZED_ACCESS');
-    }
+    // L'accès est déjà vérifié par le middleware hasFlowAccess
     
     await task.deleteOne();
     
@@ -195,16 +192,14 @@ export const deleteTask = async (req, res, next) => {
 // Marquer une tâche comme terminée
 export const completeTask = async (req, res, next) => {
   try {
-    const task = await Task.findById(req.params.id);
+    const flowId = req.params.flowId;
+    const task = await Task.findOne({ _id: req.params.id, flow: flowId });
     
     if (!task) {
       throw new NotFoundError('Tâche non trouvée', 'TASK_NOT_FOUND');
     }
     
-    // Vérifier si l'utilisateur est autorisé à modifier cette tâche
-    if (task.user.toString() !== req.user.id) {
-      throw new AuthorizationError('Accès non autorisé', 'UNAUTHORIZED_ACCESS');
-    }
+    // L'accès est déjà vérifié par le middleware hasFlowAccess
     
     // Vérifier si la tâche est déjà terminée
     if (task.status === 'completed') {

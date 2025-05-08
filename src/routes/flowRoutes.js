@@ -6,6 +6,9 @@ import {
   errorMiddleware,
   validationMiddleware,
 } from '../middleware/index.js';
+import taskRoutes from './taskRoutes.js';
+import backendConfigRoutes from './backendConfigRoutes.js';
+import conditionRoutes from './conditionRoutes.js';
 
 const router = express.Router();
 
@@ -106,5 +109,12 @@ router.delete(
   hasFlowAccess('owner'),
   asyncHandler(flowController.deleteFlow)
 );
+
+/* -------------------------------------------------------------------------- */
+/* Routes imbriquées pour les entités liées au flow                           */
+/* -------------------------------------------------------------------------- */
+router.use('/:flowId/tasks', taskRoutes);
+router.use('/:flowId/backend-configs', backendConfigRoutes);
+router.use('/:flowId/conditions', conditionRoutes);
 
 export default router;

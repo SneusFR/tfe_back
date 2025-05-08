@@ -9,7 +9,7 @@ import {
   userRoutes, 
   flowRoutes, 
   collaborationRoutes, 
-  conditionRoutes, 
+  // conditionRoutes, // Commenté pour éviter la collision avec les routes imbriquées
   taskRoutes, 
   emailRoutes, 
   attachmentRoutes,
@@ -60,12 +60,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/flows', flowRoutes);
 app.use('/api/collaborations', collaborationRoutes);
-app.use('/api/conditions', conditionRoutes);
-app.use('/api/tasks', taskRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/attachments', attachmentRoutes);
-app.use('/api/backend-configs', backendConfigRoutes);
 app.use('/api/flow', flowExecRoutes);
+
+// Note: Les routes pour tasks, conditions et backend-configs sont maintenant
+// imbriquées sous /api/flows/:flowId/ via le routeur de flow
 
 // Gestion des 404
 app.use(errorMiddleware.notFound);

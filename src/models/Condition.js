@@ -3,11 +3,15 @@ const { Schema } = mongoose;
 
 const ConditionSchema = new Schema({
   owner:         { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  flow:          { type: Schema.Types.ObjectId, ref: 'Flow', required: true },
   conditionText: { type: String, required: true },
   returnText:    { type: String, required: true }
 }, {
   timestamps: true
 });
+
+// Index pour recherche rapide par flow
+ConditionSchema.index({ flow: 1 });
 
 // Transformer _id en id pour le frontend
 ConditionSchema.set('toJSON', {

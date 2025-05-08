@@ -65,6 +65,7 @@ const KeyVal = new Schema({ key: String, value: String }, { _id: false });
 
 const BackendConfigSchema = new Schema({
   owner: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  flow: { type: Schema.Types.ObjectId, ref: 'Flow', required: true },
   name: { type: String, required: true },
   description: String,
 
@@ -91,11 +92,14 @@ const BackendConfigSchema = new Schema({
   timestamps: true
 });
 
-/* ----------- Garantir l'unicité de la config active par utilisateur ---------- */
+/* ----------- Garantir l'unicité de la config active par flow ---------- */
 BackendConfigSchema.index(
-  { owner: 1, isActive: 1 },
+  { flow: 1, isActive: 1 },
   { unique: true, partialFilterExpression: { isActive: true } }
 );
+
+/* ----------- Index pour recherche rapide par flow ---------- */
+BackendConfigSchema.index({ flow: 1 });
 
 /* ----------- (dé)chiffrer avant save / après find ---------- */
 BackendConfigSchema.pre('save', function(next) {

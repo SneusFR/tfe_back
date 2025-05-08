@@ -2,10 +2,11 @@ import { Condition } from '../models/index.js';
 import { evaluateCondition as evalCondition, replaceVariables } from '../utils/conditionEvaluator.js';
 import { ValidationError, NotFoundError, AuthorizationError } from '../utils/AppError.js';
 
-// Récupérer toutes les conditions d'un utilisateur
+// Récupérer toutes les conditions d'un flow
 export const getConditions = async (req, res) => {
   try {
-    const conditions = await Condition.find({ owner: req.user.id });
+    const flowId = req.params.flowId;
+    const conditions = await Condition.find({ flow: flowId });
     res.json(conditions);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -15,16 +16,14 @@ export const getConditions = async (req, res) => {
 // Récupérer une condition par ID
 export const getConditionById = async (req, res) => {
   try {
-    const condition = await Condition.findById(req.params.id);
+    const flowId = req.params.flowId;
+    const condition = await Condition.findOne({ _id: req.params.id, flow: flowId });
     
     if (!condition) {
       return res.status(404).json({ message: 'Condition non trouvée' });
     }
     
-    // Vérifier si l'utilisateur est autorisé à voir cette condition
-    if (condition.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
+    // L'accès est déjà vérifié par le middleware hasFlowAccess
     
     res.json(condition);
   } catch (error) {
@@ -35,10 +34,12 @@ export const getConditionById = async (req, res) => {
 // Créer une nouvelle condition
 export const createCondition = async (req, res) => {
   try {
+    const flowId = req.params.flowId;
     const { conditionText, returnText } = req.body;
     
     const condition = new Condition({
       owner: req.user.id,
+      flow: flowId,
       conditionText,
       returnText
     });
@@ -54,18 +55,16 @@ export const createCondition = async (req, res) => {
 // Mettre à jour une condition
 export const updateCondition = async (req, res) => {
   try {
+    const flowId = req.params.flowId;
     const { conditionText, returnText } = req.body;
     
-    const condition = await Condition.findById(req.params.id);
+    const condition = await Condition.findOne({ _id: req.params.id, flow: flowId });
     
     if (!condition) {
       return res.status(404).json({ message: 'Condition non trouvée' });
     }
     
-    // Vérifier si l'utilisateur est autorisé à modifier cette condition
-    if (condition.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
+    // L'accès est déjà vérifié par le middleware hasFlowAccess
     
     condition.conditionText = conditionText || condition.conditionText;
     condition.returnText = returnText || condition.returnText;
@@ -81,16 +80,14 @@ export const updateCondition = async (req, res) => {
 // Supprimer une condition
 export const deleteCondition = async (req, res) => {
   try {
-    const condition = await Condition.findById(req.params.id);
+    const flowId = req.params.flowId;
+    const condition = await Condition.findOne({ _id: req.params.id, flow: flowId });
     
     if (!condition) {
       return res.status(404).json({ message: 'Condition non trouvée' });
     }
     
-    // Vérifier si l'utilisateur est autorisé à supprimer cette condition
-    if (condition.owner.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Accès non autorisé' });
-    }
+    // L'accès est déjà vérifié par le middleware hasFlowAccess
     
     await condition.deleteOne();
     
@@ -103,6 +100,7 @@ export const deleteCondition = async (req, res) => {
 // Évaluer une condition
 export const evaluateCondition = async (req, res, next) => {
   try {
+    const flowId = req.params.flowId;
     const { conditionId, context } = req.body;
     
     if (!conditionId) {
@@ -113,16 +111,13 @@ export const evaluateCondition = async (req, res, next) => {
       throw new ValidationError('Contexte requis et doit être un objet', 'INVALID_CONTEXT');
     }
     
-    const condition = await Condition.findById(conditionId);
+    const condition = await Condition.findOne({ _id: conditionId, flow: flowId });
     
     if (!condition) {
       throw new NotFoundError('Condition non trouvée', 'CONDITION_NOT_FOUND');
     }
     
-    // Vérifier si l'utilisateur est autorisé à évaluer cette condition
-    if (condition.owner.toString() !== req.user.id) {
-      throw new AuthorizationError('Accès non autorisé à cette condition', 'UNAUTHORIZED_ACCESS');
-    }
+    // L'accès est déjà vérifié par le middleware hasFlowAccess
     
     // Évaluer la condition avec le contexte fourni
     const result = evalCondition(condition.conditionText, context);

@@ -6,7 +6,7 @@ const ROLE = { VIEWER: 'viewer', EDITOR: 'editor', OWNER: 'owner' };
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
-const roleRank = { [ROLE.VIEWER]: 0, [ROLE.EDITOR]: 1, [ROLE.OWNER]: 2 };
+const roleRank = { [ROLE.VIEWER]: 1, [ROLE.EDITOR]: 2, [ROLE.OWNER]: 3 };
 
 const hasAccess = (userRole, required = ROLE.VIEWER) =>
   roleRank[userRole] >= roleRank[required];
