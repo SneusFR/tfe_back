@@ -1,4 +1,5 @@
-import { Collaboration, Flow } from '../models/index.js';
+import { Collaboration, Flow, User } from '../models/index.js';
+import { COLLABORATION_ROLE } from '../utils/constants.js';
 
 // Récupérer toutes les collaborations pour un flow
 export const getCollaborationsByFlow = async (req, res) => {
@@ -32,7 +33,7 @@ export const getCollaborationsByUser = async (req, res) => {
 // Créer une nouvelle collaboration
 export const createCollaboration = async (req, res) => {
   try {
-    const { flowId, userId, role } = req.body;
+    const { flowId, userId, email, role } = req.body;
     
     // Vérifier si le flow existe
     const flow = await Flow.findById(flowId);
@@ -43,10 +44,22 @@ export const createCollaboration = async (req, res) => {
     // Vérifier si l'utilisateur est autorisé à ajouter des collaborateurs à ce flow
     // Cette vérification sera gérée par un middleware d'autorisation
     
+    // Déterminer l'ID de l'utilisateur (soit directement fourni, soit recherché par email)
+    let userIdToUse = userId;
+    
+    // Si userId n'est pas fourni mais email l'est, rechercher l'utilisateur par email
+    if (!userIdToUse && email) {
+      const user = await User.findOne({ email: email.toLowerCase() });
+      if (!user) {
+        return res.status(404).json({ message: 'Utilisateur non trouvé avec cet email' });
+      }
+      userIdToUse = user._id;
+    }
+    
     // Vérifier si la collaboration existe déjà
     const existingCollaboration = await Collaboration.findOne({
       flow: flowId,
-      user: userId
+      user: userIdToUse
     });
     
     if (existingCollaboration) {
@@ -55,8 +68,8 @@ export const createCollaboration = async (req, res) => {
     
     const collaboration = new Collaboration({
       flow: flowId,
-      user: userId,
-      role: role || 'viewer'
+      user: userIdToUse,
+      role: role || COLLABORATION_ROLE.VIEWER
     });
     
     const createdCollaboration = await collaboration.save();
@@ -83,6 +96,21 @@ export const updateCollaboration = async (req, res) => {
     // Vérifier si l'utilisateur est autorisé à modifier cette collaboration
     // Cette vérification sera gérée par un middleware d'autorisation
     
+    // Vérifier si c'est le dernier owner et qu'on essaie de changer son rôle
+    if (collaboration.role === COLLABORATION_ROLE.OWNER && role !== COLLABORATION_ROLE.OWNER) {
+      // Compter les owners restants
+      const ownersCount = await Collaboration.countDocuments({
+        flow: collaboration.flow,
+        role: COLLABORATION_ROLE.OWNER
+      });
+      
+      if (ownersCount <= 1) {
+        return res.status(403).json({ 
+          message: 'Impossible de rétrograder le dernier propriétaire du flow' 
+        });
+      }
+    }
+    
     collaboration.role = role || collaboration.role;
     
     const updatedCollaboration = await collaboration.save();
@@ -107,6 +135,21 @@ export const deleteCollaboration = async (req, res) => {
     
     // Vérifier si l'utilisateur est autorisé à supprimer cette collaboration
     // Cette vérification sera gérée par un middleware d'autorisation
+    
+    // Vérifier si c'est le dernier owner
+    if (collaboration.role === COLLABORATION_ROLE.OWNER) {
+      // Compter les owners restants
+      const ownersCount = await Collaboration.countDocuments({
+        flow: collaboration.flow,
+        role: COLLABORATION_ROLE.OWNER
+      });
+      
+      if (ownersCount <= 1) {
+        return res.status(403).json({ 
+          message: 'Impossible de supprimer le dernier propriétaire du flow' 
+        });
+      }
+    }
     
     await collaboration.deleteOne();
     

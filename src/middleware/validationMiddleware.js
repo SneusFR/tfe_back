@@ -69,19 +69,28 @@ export const validateFlow = (req, res, next) => {
 /**
  * Middleware pour valider les données d'une collaboration
  */
+import { COLLABORATION_ROLE } from '../utils/constants.js';
+
 export const validateCollaboration = (req, res, next) => {
   try {
-    const { flowId, userId, role } = req.body;
+    const { flowId, userId, email, role } = req.body;
     
     if (!flowId) {
       throw new ValidationError('ID du flow requis', 'MISSING_FLOW_ID');
     }
     
-    if (!userId) {
-      throw new ValidationError('ID de l\'utilisateur requis', 'MISSING_USER_ID');
+    if (!userId && !email) {
+      throw new ValidationError('ID ou email de l\'utilisateur requis', 'MISSING_USER_IDENTIFIER');
     }
     
-    if (role && !['owner', 'editor', 'viewer'].includes(role)) {
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        throw new ValidationError('Format d\'email invalide', 'INVALID_EMAIL_FORMAT');
+      }
+    }
+    
+    if (role && !Object.values(COLLABORATION_ROLE).includes(role)) {
       throw new ValidationError('Rôle invalide', 'INVALID_ROLE');
     }
     

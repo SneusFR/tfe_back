@@ -3,6 +3,16 @@ import * as flowService from '../services/flowService.js';
 /* -------------------------------------------------------------------------- */
 /* Liste + création                                                           */
 /* -------------------------------------------------------------------------- */
+export const getMyFlows = async (req, res, next) => {
+  try {
+    const flows = await flowService.getUserFlows(req.user.id);
+    res.json(flows);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Fonction maintenue pour compatibilité
 export const listFlows = async (req, res) => {
   try {
     const flows = await flowService.getUserFlows(req.user.id);

@@ -83,11 +83,13 @@ export const hasRole = (roles) => {
   };
 };
 
+import { COLLABORATION_ROLE } from '../utils/constants.js';
+
 /**
- * Middleware pour vérifier l’accès à un Flow via le service de collaborations
+ * Middleware pour vérifier l'accès à un Flow via le service de collaborations
  * @param {string} requiredRole - Rôle requis (owner, editor, viewer)
  */
-export const hasFlowAccess = (requiredRole = 'viewer') => {
+export const hasFlowAccess = (requiredRole = COLLABORATION_ROLE.VIEWER) => {
   return async (req, res, next) => {
     try {
       const flowId = req.params.id || req.params.flowId || req.body.flowId;

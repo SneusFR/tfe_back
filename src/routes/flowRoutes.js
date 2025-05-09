@@ -26,7 +26,7 @@ router.get(
   '/',
   protect,
   validatePagination,
-  asyncHandler(flowController.listFlows)    // ← nouveau nom
+  asyncHandler(flowController.getMyFlows)    // ← utilise getMyFlows au lieu de listFlows
 );
 
 /* -------------------------------------------------------------------------- */

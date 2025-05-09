@@ -114,4 +114,16 @@ router.get(
   })
 );
 
+/* ------------------------------------------------------------------------ */
+/*  POST /api/auth/logout  – Déconnexion                                    */
+/* ------------------------------------------------------------------------ */
+router.post('/logout', asyncHandler(async (_req, res) => {
+  res.cookie('token', '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 0          // efface immédiatement le cookie
+  }).json({ success: true });
+}));
+
 export default router;

@@ -22,8 +22,6 @@ const FlowVersionSchema = new Schema(
 /* -------------------------------------------------------------------------- */
 const FlowSchema = new Schema(
   {
-    owner:      { type: Types.ObjectId, ref: 'User', required: true },
-
     /*  Meta  */
     name:               { type: String, required: true },
     isActive:           { type: Boolean, default: true },
@@ -42,6 +40,7 @@ const FlowSchema = new Schema(
 /* -------------------------------------------------------------------------- */
 /* Cascade delete pour les entités liées au flow                              */
 /* -------------------------------------------------------------------------- */
+// Hook pour document.deleteOne()
 FlowSchema.pre('deleteOne', { document: true }, async function() {
   const flowId = this._id;
   const mongoose = this.constructor.base;
@@ -54,6 +53,51 @@ FlowSchema.pre('deleteOne', { document: true }, async function() {
   
   // Supprimer toutes les conditions liées à ce flow
   await mongoose.model('Condition').deleteMany({ flow: flowId });
+  
+  // Supprimer toutes les collaborations liées à ce flow
+  await mongoose.model('Collaboration').deleteMany({ flow: flowId });
+});
+
+// Hook pour Flow.findOneAndDelete() et Flow.findByIdAndDelete()
+FlowSchema.pre('findOneAndDelete', async function() {
+  const flowId = this.getQuery()._id;
+  const mongoose = this.model.base;
+  
+  // Supprimer toutes les tâches liées à ce flow
+  await mongoose.model('Task').deleteMany({ flow: flowId });
+  
+  // Supprimer toutes les configurations backend liées à ce flow
+  await mongoose.model('BackendConfig').deleteMany({ flow: flowId });
+  
+  // Supprimer toutes les conditions liées à ce flow
+  await mongoose.model('Condition').deleteMany({ flow: flowId });
+  
+  // Supprimer toutes les collaborations liées à ce flow
+  await mongoose.model('Collaboration').deleteMany({ flow: flowId });
+});
+
+// Hook pour Flow.deleteMany()
+FlowSchema.pre('deleteMany', async function() {
+  const filter = this.getQuery();
+  const mongoose = this.model.base;
+  
+  // Trouver tous les flows qui correspondent au filtre
+  const flows = await this.model.find(filter).select('_id');
+  const flowIds = flows.map(flow => flow._id);
+  
+  if (flowIds.length > 0) {
+    // Supprimer toutes les tâches liées à ces flows
+    await mongoose.model('Task').deleteMany({ flow: { $in: flowIds } });
+    
+    // Supprimer toutes les configurations backend liées à ces flows
+    await mongoose.model('BackendConfig').deleteMany({ flow: { $in: flowIds } });
+    
+    // Supprimer toutes les conditions liées à ces flows
+    await mongoose.model('Condition').deleteMany({ flow: { $in: flowIds } });
+    
+    // Supprimer toutes les collaborations liées à ces flows
+    await mongoose.model('Collaboration').deleteMany({ flow: { $in: flowIds } });
+  }
 });
 
 /* -------------------------------------------------------------------------- */

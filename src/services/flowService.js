@@ -1,18 +1,21 @@
 import { Flow, Collaboration } from '../models/index.js';
+import { COLLABORATION_ROLE, ROLE_HIERARCHY } from '../utils/constants.js';
 
 const MAX_VARIANTS = 3;                            // ← 3 variantes fixes
-const ROLE = { VIEWER: 'viewer', EDITOR: 'editor', OWNER: 'owner' };
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
-const roleRank = { [ROLE.VIEWER]: 1, [ROLE.EDITOR]: 2, [ROLE.OWNER]: 3 };
+// Créer un objet de rang à partir du tableau de hiérarchie
+const RANK = {};
+ROLE_HIERARCHY.forEach((role, index) => {
+  RANK[role] = index + 1;
+});
 
-const hasAccess = (userRole, required = ROLE.VIEWER) =>
-  roleRank[userRole] >= roleRank[required];
+const hasAccess = (userRole, required = COLLABORATION_ROLE.VIEWER) =>
+  RANK[userRole] >= RANK[required];
 
 const findCollabRole = async (flow, userId) => {
-  if (flow.owner.toString() === userId) return ROLE.OWNER;
   const collab = await Collaboration.findOne({ flow: flow._id, user: userId });
   return collab?.role ?? null;
 };
@@ -29,14 +32,13 @@ export const createFlow = async (userId, { name }) => {
   }));
 
   const flow = await Flow.create({
-    owner: userId,
     name,
     versions: variants,
     currentVersionIndex: 0,
   });
 
-  // Collaboration owner
-  await Collaboration.create({ flow: flow._id, user: userId, role: ROLE.OWNER });
+  // Création de la collaboration owner pour gérer les permissions
+  await Collaboration.create({ flow: flow._id, user: userId, role: COLLABORATION_ROLE.OWNER });
   return flow.toJSON();
 };
 
@@ -51,13 +53,12 @@ export const getFlow = async (flowId, userId) => {
 };
 
 export const getUserFlows = async (userId) => {
-  const owned = await Flow.find({ owner: userId });
   const collabs = await Collaboration.find({ user: userId }).populate('flow');
-
-  return [
-    ...owned.map((f) => ({ ...f.toJSON(), userRole: ROLE.OWNER })),
-    ...collabs.map((c) => ({ ...c.flow.toJSON(), userRole: c.role })),
-  ];
+  
+  // Filter out collaborations with null or undefined flows
+  return collabs
+    .filter(c => c.flow)
+    .map(c => ({ ...c.flow.toJSON(), userRole: c.role }));
 };
 
 /* -------------------------------------------------------------------------- */
@@ -68,7 +69,7 @@ export const saveCurrentVariant = async (flowId, userId, { nodes = [], edges = [
   if (!flow) throw new Error('FLOW_NOT_FOUND');
 
   const role = await findCollabRole(flow, userId);
-  if (!hasAccess(role, ROLE.EDITOR)) throw new Error('FORBIDDEN');
+  if (!hasAccess(role, COLLABORATION_ROLE.EDITOR)) throw new Error('FORBIDDEN');
 
   const i = flow.currentVersionIndex;           // 0, 1 ou 2
   flow.versions[i] = { nodes, edges, savedAt: Date.now() };
@@ -104,9 +105,12 @@ export const switchVariant = async (flowId, userId, index) => {
 export const deleteFlow = async (flowId, userId) => {
   const flow = await Flow.findById(flowId);
   if (!flow) throw new Error('FLOW_NOT_FOUND');
-  if (flow.owner.toString() !== userId) throw new Error('FORBIDDEN');
+  
+  // Vérifier si l'utilisateur est owner via la collaboration
+  const collab = await Collaboration.findOne({ flow: flowId, user: userId });
+  if (!collab || collab.role !== COLLABORATION_ROLE.OWNER) throw new Error('FORBIDDEN');
 
-  await Collaboration.deleteMany({ flow: flowId });
+  // La suppression des collaborations est gérée par le middleware pre('deleteOne') du modèle Flow
   await flow.deleteOne();
 };
 
@@ -117,7 +121,7 @@ export const deleteFlow = async (flowId, userId) => {
  * @param {string} requiredRole - Rôle requis (owner, editor, viewer)
  * @returns {Promise<boolean>} - True si l'utilisateur a accès, false sinon
  */
-export const checkFlowAccess = async (userId, flowId, requiredRole = ROLE.VIEWER) => {
+export const checkFlowAccess = async (userId, flowId, requiredRole = COLLABORATION_ROLE.VIEWER) => {
   try {
     const flow = await Flow.findById(flowId);
     if (!flow) return false;

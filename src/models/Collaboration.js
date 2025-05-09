@@ -7,7 +7,7 @@ const CollaborationSchema = new Schema({
   user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   role: { 
     type: String, 
-    enum: [COLLABORATION_ROLE.OWNER, COLLABORATION_ROLE.EDITOR, COLLABORATION_ROLE.VIEWER], 
+    enum: Object.values(COLLABORATION_ROLE), 
     default: COLLABORATION_ROLE.VIEWER 
   },
 }, { 
