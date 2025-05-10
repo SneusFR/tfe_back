@@ -46,8 +46,9 @@ export const getFlow = async (flowId, userId) => {
   const flow = await Flow.findById(flowId);
   if (!flow) throw new Error('FLOW_NOT_FOUND');
 
-  const role = await findCollabRole(flow, userId);
-  if (!role) throw new Error('FORBIDDEN');
+  // Récupérer la collaboration directement
+  const collaboration = await Collaboration.findOne({ flow: flowId, user: userId });
+  if (!collaboration) throw new Error('FORBIDDEN');
 
   return flow.toJSON();
 };
@@ -68,8 +69,11 @@ export const saveCurrentVariant = async (flowId, userId, { nodes = [], edges = [
   const flow = await Flow.findById(flowId);
   if (!flow) throw new Error('FLOW_NOT_FOUND');
 
-  const role = await findCollabRole(flow, userId);
-  if (!hasAccess(role, COLLABORATION_ROLE.EDITOR)) throw new Error('FORBIDDEN');
+  // Récupérer la collaboration directement
+  const collaboration = await Collaboration.findOne({ flow: flowId, user: userId });
+  if (!collaboration || RANK[collaboration.role] < RANK[COLLABORATION_ROLE.EDITOR]) {
+    throw new Error('FORBIDDEN');
+  }
 
   const i = flow.currentVersionIndex;           // 0, 1 ou 2
   flow.versions[i] = { nodes, edges, savedAt: Date.now() };
@@ -87,10 +91,11 @@ export const switchVariant = async (flowId, userId, index) => {
   const flow = await Flow.findById(flowId);
   if (!flow) throw new Error('FLOW_NOT_FOUND');
 
-  const role = await findCollabRole(flow, userId);
-  if (!role) throw new Error('FORBIDDEN');      // même viewer peut switcher
+  // Récupérer la collaboration directement
+  const collaboration = await Collaboration.findOne({ flow: flowId, user: userId });
+  if (!collaboration) throw new Error('FORBIDDEN');      // même viewer peut switcher
 
-  // Initialise la case si elle n’existe pas encore
+  // Initialise la case si elle n'existe pas encore
   if (!flow.versions[index])
     flow.versions[index] = { nodes: [], edges: [], savedAt: null };
 
@@ -123,13 +128,14 @@ export const deleteFlow = async (flowId, userId) => {
  */
 export const checkFlowAccess = async (userId, flowId, requiredRole = COLLABORATION_ROLE.VIEWER) => {
   try {
-    const flow = await Flow.findById(flowId);
-    if (!flow) return false;
+    // 1. Récupérer la collaboration directement (sans passer par le flow)
+    const collaboration = await Collaboration.findOne({ flow: flowId, user: userId });
     
-    const userRole = await findCollabRole(flow, userId);
-    if (!userRole) return false;
+    // Si aucune collaboration n'existe, l'accès est refusé
+    if (!collaboration) return false;
     
-    return hasAccess(userRole, requiredRole);
+    // 2. Comparer les rangs pour déterminer la permission
+    return RANK[collaboration.role] >= RANK[requiredRole];
   } catch (error) {
     return false;
   }

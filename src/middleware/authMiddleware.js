@@ -1,6 +1,6 @@
 // src/middleware/authMiddleware.js
 import jwt from 'jsonwebtoken';
-import { User } from '../models/index.js';
+import { User, Collaboration } from '../models/index.js';
 import { flowService } from '../services/index.js';
 import {
   AuthenticationError,
@@ -36,6 +36,23 @@ export const protect = async (req, res, next) => {
       throw new AuthenticationError('Utilisateur non trouvé', 'USER_NOT_FOUND');
     }
 
+    next();
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Middleware utilitaire pour injecter le flowId dans les paramètres de la requête
+ * à partir d'une collaboration
+ */
+export const injectFlowId = async (req, res, next) => {
+  try {
+    const collab = await Collaboration.findById(req.params.id).lean();
+    if (!collab) {
+      return res.status(404).json({ message: 'Collaboration non trouvée' });
+    }
+    req.params.flowId = collab.flow.toString();
     next();
   } catch (err) {
     next(err);
@@ -92,7 +109,7 @@ import { COLLABORATION_ROLE } from '../utils/constants.js';
 export const hasFlowAccess = (requiredRole = COLLABORATION_ROLE.VIEWER) => {
   return async (req, res, next) => {
     try {
-      const flowId = req.params.id || req.params.flowId || req.body.flowId;
+      const flowId = req.params.flowId || req.params.id || req.body.flowId;
       if (!flowId) {
         throw new ValidationError('ID du flow non fourni', 'MISSING_FLOW_ID');
       }

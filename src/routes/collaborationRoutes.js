@@ -1,10 +1,9 @@
 import express from 'express';
 import { collaborationController } from '../controllers/index.js';
 import { authMiddleware, errorMiddleware, validationMiddleware } from '../middleware/index.js';
-import { Collaboration } from '../models/index.js';
 
 const router = express.Router();
-const { protect, hasFlowAccess } = authMiddleware;
+const { protect, hasFlowAccess, injectFlowId } = authMiddleware;
 const { asyncHandler, validateMongoId } = errorMiddleware;
 const { validateCollaboration } = validationMiddleware;
 
@@ -50,17 +49,7 @@ router.post('/',
 router.put('/:id', 
   protect, 
   validateMongoId('id'), 
-  asyncHandler(async (req, res, next) => {
-    // Récupérer la collaboration pour vérifier le flow
-    const collaboration = await Collaboration.findById(req.params.id).populate('flow');
-    if (!collaboration) {
-      return res.status(404).json({ message: 'Collaboration non trouvée' });
-    }
-    
-    // Stocker le flowId dans la requête pour le middleware hasFlowAccess
-    req.params.flowId = collaboration.flow._id;
-    next();
-  }),
+  injectFlowId,
   hasFlowAccess('owner'), 
   asyncHandler(collaborationController.updateCollaboration)
 );
@@ -73,17 +62,7 @@ router.put('/:id',
 router.delete('/:id', 
   protect, 
   validateMongoId('id'), 
-  asyncHandler(async (req, res, next) => {
-    // Récupérer la collaboration pour vérifier le flow
-    const collaboration = await Collaboration.findById(req.params.id).populate('flow');
-    if (!collaboration) {
-      return res.status(404).json({ message: 'Collaboration non trouvée' });
-    }
-    
-    // Stocker le flowId dans la requête pour le middleware hasFlowAccess
-    req.params.flowId = collaboration.flow._id;
-    next();
-  }),
+  injectFlowId,
   hasFlowAccess('owner'), 
   asyncHandler(collaborationController.deleteCollaboration)
 );

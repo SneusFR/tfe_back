@@ -7,7 +7,17 @@ const UserSchema = new Schema({
   passwordHash: { type: String, required: true },
   displayName:  { type: String, default: '' }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: {
+    virtuals: true,
+    versionKey: false,
+    transform: (_, ret) => {
+      ret.id = ret._id;
+      delete ret._id;
+      delete ret.passwordHash; // Ne jamais renvoyer le hash du mot de passe
+      return ret;
+    }
+  }
 });
 
 // Créer un index unique pour l'email
@@ -27,16 +37,9 @@ UserSchema.pre('save', async function(next) {
   }
 });
 
-// Transformer _id en id pour le frontend
-UserSchema.set('toJSON', {
-  virtuals: true,
-  versionKey: false,
-  transform: (_, ret) => {
-    ret.id = ret._id;
-    delete ret._id;
-    delete ret.passwordHash; // Ne jamais renvoyer le hash du mot de passe
-    return ret;
-  }
+// Ajouter un champ virtuel 'id' qui sera toujours disponible, même via populate
+UserSchema.virtual('id').get(function() {
+  return this._id;
 });
 
 // Méthode pour comparer les mots de passe
