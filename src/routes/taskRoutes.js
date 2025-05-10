@@ -1,6 +1,7 @@
 import express from 'express';
 import { taskController } from '../controllers/index.js';
 import { authMiddleware, errorMiddleware, validationMiddleware } from '../middleware/index.js';
+import { COLLABORATION_ROLE } from '../utils/constants.js';
 
 const router = express.Router({ mergeParams: true }); // Pour accéder aux params de la route parent (flowId)
 const { protect, hasFlowAccess } = authMiddleware;
@@ -8,7 +9,7 @@ const { asyncHandler, validateMongoId } = errorMiddleware;
 const { validateTask, validatePagination } = validationMiddleware;
 
 // Appliquer le middleware hasFlowAccess à toutes les routes
-router.use(protect, hasFlowAccess('viewer'));
+router.use(protect, hasFlowAccess(COLLABORATION_ROLE.VIEWER));
 
 /**
  * @route   GET /api/flow/:flowId/tasks
@@ -29,27 +30,27 @@ router.get('/:id', validateMongoId('id'), asyncHandler(taskController.getTaskByI
  * @desc    Créer une nouvelle tâche
  * @access  Private (editor+)
  */
-router.post('/', hasFlowAccess('editor'), validateTask, asyncHandler(taskController.createTask));
+router.post('/', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateTask, asyncHandler(taskController.createTask));
 
 /**
  * @route   PUT /api/flow/:flowId/tasks/:id
  * @desc    Mettre à jour une tâche
  * @access  Private (editor+)
  */
-router.put('/:id', hasFlowAccess('editor'), validateMongoId('id'), validateTask, asyncHandler(taskController.updateTask));
+router.put('/:id', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateMongoId('id'), validateTask, asyncHandler(taskController.updateTask));
 
 /**
  * @route   DELETE /api/flow/:flowId/tasks/:id
  * @desc    Supprimer une tâche
  * @access  Private (editor+)
  */
-router.delete('/:id', hasFlowAccess('editor'), validateMongoId('id'), asyncHandler(taskController.deleteTask));
+router.delete('/:id', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateMongoId('id'), asyncHandler(taskController.deleteTask));
 
 /**
  * @route   PUT /api/flow/:flowId/tasks/:id/complete
  * @desc    Marquer une tâche comme terminée
  * @access  Private (editor+)
  */
-router.put('/:id/complete', hasFlowAccess('editor'), validateMongoId('id'), asyncHandler(taskController.completeTask));
+router.put('/:id/complete', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateMongoId('id'), asyncHandler(taskController.completeTask));
 
 export default router;

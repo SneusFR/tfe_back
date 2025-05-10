@@ -1,6 +1,7 @@
 import express from 'express';
 import { collaborationController } from '../controllers/index.js';
 import { authMiddleware, errorMiddleware, validationMiddleware } from '../middleware/index.js';
+import { COLLABORATION_ROLE } from '../utils/constants.js';
 
 const router = express.Router();
 const { protect, hasFlowAccess, injectFlowId } = authMiddleware;
@@ -15,7 +16,7 @@ const { validateCollaboration } = validationMiddleware;
 router.get('/flow/:flowId', 
   protect, 
   validateMongoId('flowId'), 
-  hasFlowAccess('viewer'), 
+  hasFlowAccess(COLLABORATION_ROLE.VIEWER), 
   asyncHandler(collaborationController.getCollaborationsByFlow)
 );
 
@@ -37,7 +38,7 @@ router.get('/user',
 router.post('/', 
   protect, 
   validateCollaboration, 
-  hasFlowAccess('owner'), 
+  hasFlowAccess(COLLABORATION_ROLE.OWNER), 
   asyncHandler(collaborationController.createCollaboration)
 );
 
@@ -50,7 +51,7 @@ router.put('/:id',
   protect, 
   validateMongoId('id'), 
   injectFlowId,
-  hasFlowAccess('owner'), 
+  hasFlowAccess(COLLABORATION_ROLE.OWNER), 
   asyncHandler(collaborationController.updateCollaboration)
 );
 
@@ -63,7 +64,7 @@ router.delete('/:id',
   protect, 
   validateMongoId('id'), 
   injectFlowId,
-  hasFlowAccess('owner'), 
+  hasFlowAccess(COLLABORATION_ROLE.OWNER), 
   asyncHandler(collaborationController.deleteCollaboration)
 );
 

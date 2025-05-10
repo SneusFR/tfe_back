@@ -2,6 +2,7 @@ import express from 'express';
 import { conditionController } from '../controllers/index.js';
 import { authMiddleware, errorMiddleware, validationMiddleware } from '../middleware/index.js';
 import { Condition } from '../models/index.js';
+import { COLLABORATION_ROLE } from '../utils/constants.js';
 
 const router = express.Router({ mergeParams: true }); // Pour accéder aux params de la route parent (flowId)
 const { protect, hasFlowAccess } = authMiddleware;
@@ -9,7 +10,7 @@ const { asyncHandler, validateMongoId } = errorMiddleware;
 const { validateCondition, validatePagination } = validationMiddleware;
 
 // Appliquer le middleware hasFlowAccess à toutes les routes
-router.use(protect, hasFlowAccess('viewer'));
+router.use(protect, hasFlowAccess(COLLABORATION_ROLE.VIEWER));
 
 /**
  * @route   GET /api/flow/:flowId/conditions
@@ -50,21 +51,21 @@ router.get('/:id', validateMongoId('id'), asyncHandler(conditionController.getCo
  * @desc    Créer une nouvelle condition
  * @access  Private (editor+)
  */
-router.post('/', hasFlowAccess('editor'), validateCondition, asyncHandler(conditionController.createCondition));
+router.post('/', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateCondition, asyncHandler(conditionController.createCondition));
 
 /**
  * @route   PUT /api/flow/:flowId/conditions/:id
  * @desc    Mettre à jour une condition
  * @access  Private (editor+)
  */
-router.put('/:id', hasFlowAccess('editor'), validateMongoId('id'), validateCondition, asyncHandler(conditionController.updateCondition));
+router.put('/:id', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateMongoId('id'), validateCondition, asyncHandler(conditionController.updateCondition));
 
 /**
  * @route   DELETE /api/flow/:flowId/conditions/:id
  * @desc    Supprimer une condition
  * @access  Private (editor+)
  */
-router.delete('/:id', hasFlowAccess('editor'), validateMongoId('id'), asyncHandler(conditionController.deleteCondition));
+router.delete('/:id', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateMongoId('id'), asyncHandler(conditionController.deleteCondition));
 
 /**
  * @route   POST /api/flow/:flowId/conditions/evaluate

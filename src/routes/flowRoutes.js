@@ -9,6 +9,7 @@ import {
 import taskRoutes from './taskRoutes.js';
 import backendConfigRoutes from './backendConfigRoutes.js';
 import conditionRoutes from './conditionRoutes.js';
+import { COLLABORATION_ROLE } from '../utils/constants.js';
 
 const router = express.Router();
 
@@ -61,7 +62,7 @@ router.get(
   '/:id',
   protect,
   validateMongoId('id'),
-  hasFlowAccess('viewer'),
+  hasFlowAccess(COLLABORATION_ROLE.VIEWER),
   asyncHandler(flowController.getFlow)      // ← nouveau nom
 );
 
@@ -83,7 +84,7 @@ router.put(
   '/:id',
   protect,
   validateMongoId('id'),
-  hasFlowAccess('editor'),
+  hasFlowAccess(COLLABORATION_ROLE.EDITOR),
   asyncHandler(flowController.saveVariant)  // ← écrase l’onglet courant
 );
 
@@ -95,7 +96,7 @@ router.patch(
   '/:id/version',
   protect,
   validateMongoId('id'),
-  hasFlowAccess('viewer'),                  // un simple viewer peut switcher
+  hasFlowAccess(COLLABORATION_ROLE.VIEWER),                  // un simple viewer peut switcher
   asyncHandler(flowController.switchVariant)
 );
 
@@ -106,7 +107,7 @@ router.delete(
   '/:id',
   protect,
   validateMongoId('id'),
-  hasFlowAccess('owner'),
+  hasFlowAccess(COLLABORATION_ROLE.OWNER),
   asyncHandler(flowController.deleteFlow)
 );
 
