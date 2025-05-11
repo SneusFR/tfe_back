@@ -17,23 +17,39 @@ export const protect = async (req, res, next) => {
   try {
     const token = req.cookies.token;
     if (!token) {
-      throw new AuthenticationError('Non autorisé, token manquant', 'NO_TOKEN');
+      return res.status(401).json({
+        success: false,
+        message: 'Non autorisé, token manquant',
+        code: 'NO_TOKEN'
+      });
     }
 
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch {
-      throw new AuthenticationError('Non autorisé, token invalide', 'INVALID_TOKEN');
+      return res.status(401).json({
+        success: false,
+        message: 'Non autorisé, token invalide',
+        code: 'INVALID_TOKEN'
+      });
     }
 
     if (!decoded.id) {
-      throw new AuthenticationError('Token malformé', 'MALFORMED_TOKEN');
+      return res.status(401).json({
+        success: false,
+        message: 'Token malformé',
+        code: 'MALFORMED_TOKEN'
+      });
     }
 
     req.user = await User.findById(decoded.id).select('-passwordHash');
     if (!req.user) {
-      throw new AuthenticationError('Utilisateur non trouvé', 'USER_NOT_FOUND');
+      return res.status(401).json({
+        success: false,
+        message: 'Utilisateur non trouvé',
+        code: 'USER_NOT_FOUND'
+      });
     }
 
     next();
@@ -68,10 +84,18 @@ export const isOwner = (getResourceOwnerId) => {
     try {
       const ownerId = await getResourceOwnerId(req);
       if (!ownerId) {
-        throw new NotFoundError('Ressource non trouvée', 'RESOURCE_NOT_FOUND');
+        return res.status(404).json({
+          success: false,
+          message: 'Ressource non trouvée',
+          code: 'RESOURCE_NOT_FOUND'
+        });
       }
       if (ownerId.toString() !== req.user.id) {
-        throw new AuthorizationError('Accès non autorisé', 'UNAUTHORIZED_ACCESS');
+        return res.status(403).json({
+          success: false,
+          message: 'Accès non autorisé',
+          code: 'UNAUTHORIZED_ACCESS'
+        });
       }
       next();
     } catch (err) {
@@ -88,10 +112,18 @@ export const hasRole = (roles) => {
   return (req, res, next) => {
     try {
       if (!req.user || !req.user.role) {
-        throw new AuthorizationError('Accès non autorisé', 'UNAUTHORIZED_ACCESS');
+        return res.status(403).json({
+          success: false,
+          message: 'Accès non autorisé',
+          code: 'UNAUTHORIZED_ACCESS'
+        });
       }
       if (!roles.includes(req.user.role)) {
-        throw new AuthorizationError('Accès non autorisé pour ce rôle', 'INSUFFICIENT_ROLE');
+        return res.status(403).json({
+          success: false,
+          message: 'Accès non autorisé pour ce rôle',
+          code: 'INSUFFICIENT_ROLE'
+        });
       }
       next();
     } catch (err) {
@@ -111,7 +143,11 @@ export const hasFlowAccess = (requiredRole = COLLABORATION_ROLE.VIEWER) => {
     try {
       const flowId = req.params.flowId || req.params.id || req.body.flowId;
       if (!flowId) {
-        throw new ValidationError('ID du flow non fourni', 'MISSING_FLOW_ID');
+        return res.status(400).json({
+          success: false,
+          message: 'ID du flow non fourni',
+          code: 'MISSING_FLOW_ID'
+        });
       }
 
       const hasAccess = await flowService.checkFlowAccess(
@@ -120,10 +156,11 @@ export const hasFlowAccess = (requiredRole = COLLABORATION_ROLE.VIEWER) => {
         requiredRole
       );
       if (!hasAccess) {
-        throw new AuthorizationError(
-          'Accès non autorisé à ce flow',
-          'INSUFFICIENT_FLOW_PERMISSION'
-        );
+        return res.status(403).json({
+          success: false,
+          message: 'Accès non autorisé à ce flow',
+          code: 'INSUFFICIENT_FLOW_PERMISSION'
+        });
       }
 
       next();

@@ -7,12 +7,13 @@ const { Schema, Types } = mongoose;
 /* -------------------------------------------------------------------------- */
 const FlowVersionSchema = new Schema(
   {
-    // facultatif : donner un nom à la variante
+    // facultatif : donner un nom à la variante
     label:      { type: String, default: '' },
 
     /*  Les vraies données du diagramme  */
     nodes:      { type: [Schema.Types.Mixed], default: [] },
     edges:      { type: [Schema.Types.Mixed], default: [] },
+    savedAt:    { type: Date, default: Date.now }
   },
   { _id: false, timestamps: true }          // _id inutile dans un sous‑doc
 );

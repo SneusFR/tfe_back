@@ -6,6 +6,12 @@ export const getCollaborationsByFlow = async (req, res) => {
   try {
     const flowId = req.params.flowId;
     
+    // Vérifier si le flow existe
+    const flow = await Flow.findById(flowId);
+    if (!flow) {
+      return res.status(404).json({ message: 'Flow non trouvé' });
+    }
+    
     // Vérifier si l'utilisateur est autorisé à voir les collaborations de ce flow
     // Cette vérification sera gérée par un middleware d'autorisation
     

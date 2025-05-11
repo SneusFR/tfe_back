@@ -1,32 +1,14 @@
-// models/BackendConfig.js
+// Mock for BackendConfig.js
 import mongoose from 'mongoose';
 import crypto from 'crypto';
 
 const { Schema } = mongoose;
 
 /* ----------- Chiffrement des secrets avec rotation de clé ----------- */
-// Vérifier que les clés font exactement 32 bytes
-const CURRENT_KEY = process.env.SECRET_ENC_KEY;
-const NEXT_KEY = process.env.SECRET_ENC_KEY_NEXT;
+// For testing, we'll use a fixed key
+const CURRENT_KEY = 'testtesttesttesttesttesttesttest'; // 32 characters
+const NEXT_KEY = null;
 
-// Validation des clés
-if (process.env.NODE_ENV !== 'test') {
-  if (!CURRENT_KEY || CURRENT_KEY.length !== 32) {
-    console.error('ERREUR: SECRET_ENC_KEY doit faire exactement 32 caractères');
-    process.exit(1); // Arrêter le serveur si la clé n'est pas valide
-  }
-
-  if (NEXT_KEY && NEXT_KEY.length !== 32) {
-    console.error('ERREUR: SECRET_ENC_KEY_NEXT doit faire exactement 32 caractères');
-    process.exit(1); // Arrêter le serveur si la clé de rotation n'est pas valide
-  }
-} else {
-  // En mode test, utiliser une clé fixe
-  if (!CURRENT_KEY || CURRENT_KEY.length !== 32) {
-    process.env.SECRET_ENC_KEY = 'testtesttesttesttesttesttesttest';
-    CURRENT_KEY = process.env.SECRET_ENC_KEY;
-  }
-}
 const IV_LENGTH = 16;
 
 const encrypt = (text = '') => {
