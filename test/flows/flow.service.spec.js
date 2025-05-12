@@ -48,7 +48,8 @@ describe('Flow Service', () => {
     it('should return a flow if user has access', async () => {
       const flow = await flowService.getFlow(testFlow.id, testUser.id);
       expect(flow).toBeDefined();
-      expect(flow.id).toBe(testFlow.id);
+      // on cast explicitement en string pour éviter la comparaison d'un ObjectId
+      expect(flow.id.toString()).toStrictEqual(testFlow.id.toString());
       expect(flow.name).toBe(testFlow.name);
     });
 

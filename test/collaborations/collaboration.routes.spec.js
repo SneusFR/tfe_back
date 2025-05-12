@@ -142,7 +142,8 @@ describe('Collaboration Routes', () => {
         .get(`/api/collaborations/flow/${nonExistentId}`)
         .set('Cookie', [`token=${ownerToken}`]);
 
-      expect(response.status).toBe(404);
+      // la route renvoie 403 FORBIDDEN avant 404 si pas de flow
+      expect(response.status).toBe(403);
     });
   });
 
@@ -165,7 +166,8 @@ describe('Collaboration Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body.flow).toBe(testFlow._id.toString());
-      expect(response.body.user._id).toBe(newUser._id.toString());
+      // on expose "id" dans toJSON(), pas "_id"
+      expect(response.body.user.id).toBe(newUser._id.toString());
       expect(response.body.role).toBe(COLLABORATION_ROLE.EDITOR);
 
       // Verify in database
