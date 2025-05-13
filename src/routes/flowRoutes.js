@@ -1,5 +1,6 @@
 // routes/flowRoutes.js
 import express from 'express';
+import { body, validationResult } from 'express-validator';
 import { flowController } from '../controllers/index.js';
 import {
   authMiddleware,
@@ -21,13 +22,33 @@ const { asyncHandler, validateMongoId }  = errorMiddleware;
 const { validateFlow, validatePagination } = validationMiddleware;
 
 /* -------------------------------------------------------------------------- */
-/* GET /api/flows – liste paginée                                             */
+/* GET /api/flows – liste paginée                                             */
 /* -------------------------------------------------------------------------- */
 router.get(
   '/',
   protect,
   validatePagination,
   asyncHandler(flowController.getMyFlows)    // ← utilise getMyFlows au lieu de listFlows
+);
+
+/* -------------------------------------------------------------------------- */
+/* POST /api/flows – création                                                 */
+/* -------------------------------------------------------------------------- */
+router.post(
+  '/',
+  protect,
+  body('name').notEmpty().withMessage('Le nom est requis'),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ 
+        message: errors.array()[0].msg,
+        errors: errors.array() 
+      });
+    }
+    next();
+  },
+  asyncHandler(flowController.createFlow)   // inchangé
 );
 
 /* -------------------------------------------------------------------------- */
@@ -56,7 +77,7 @@ router.get(
 );
 
 /* -------------------------------------------------------------------------- */
-/* GET /api/flows/:id – détail d’un flow                                      */
+/* GET /api/flows/:id – détail d'un flow                                      */
 /* -------------------------------------------------------------------------- */
 router.get(
   '/:id',
@@ -64,16 +85,6 @@ router.get(
   validateMongoId('id'),
   hasFlowAccess(COLLABORATION_ROLE.VIEWER),
   asyncHandler(flowController.getFlow)      // ← nouveau nom
-);
-
-/* -------------------------------------------------------------------------- */
-/* POST /api/flows – création                                                 */
-/* -------------------------------------------------------------------------- */
-router.post(
-  '/',
-  protect,
-  validateFlow,
-  asyncHandler(flowController.createFlow)   // inchangé
 );
 
 /* -------------------------------------------------------------------------- */

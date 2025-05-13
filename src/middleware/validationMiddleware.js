@@ -1,4 +1,20 @@
 import { ValidationError } from '../utils/AppError.js';
+import { validationResult } from 'express-validator';
+
+/**
+ * Middleware pour gérer les erreurs de validation d'express-validator
+ */
+export const validationMiddleware = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const firstError = errors.array()[0];
+    return res.status(400).json({ 
+      message: firstError.msg,
+      errors: errors.array() 
+    });
+  }
+  next();
+};
 
 /**
  * Middleware pour valider les données d'un utilisateur

@@ -1,9 +1,10 @@
 export default {
   testEnvironment: 'node',
   transform: {},
-  moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1',
-  },
+  // Commented out to avoid issues with ESM mocking
+  // moduleNameMapper: {
+  //   '^(\\.{1,2}/.*)\\.js$': '$1',
+  // },
   setupFilesAfterEnv: ['./jest.setup.js'],
   testMatch: ['**/test/**/*.spec.js'],
   collectCoverage: true,

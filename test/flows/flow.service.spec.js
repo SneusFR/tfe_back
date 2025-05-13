@@ -1,8 +1,11 @@
-import mongoose from 'mongoose';
-import { setupTestDB, signJwt } from '../utils/testSetup.js';
-import { Flow, User, Collaboration } from '../../src/models/index.js';
-import * as flowService from '../../src/services/flowService.js';
-import { COLLABORATION_ROLE } from '../../src/utils/constants.js';
+import { jest } from '@jest/globals';
+
+// Imports dynamiques pour être sûr qu'ils sont chargés après les mocks
+const mongoose = (await import('mongoose')).default;
+const { setupTestDB, signJwt } = await import('../utils/testSetup.js');
+const { Flow, User, Collaboration } = await import('../../src/models/index.js');
+const flowService = await import('../../src/services/flowService.js');
+const { COLLABORATION_ROLE } = await import('../../src/utils/constants.js');
 
 // Setup the in-memory database for testing
 setupTestDB();
