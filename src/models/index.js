@@ -6,6 +6,7 @@ import Task from './Task.js';
 import Email from './Email.js';
 import Attachment from './Attachment.js';
 import BackendConfig from './BackendConfig.js';
+import ExecutionLog from './ExecutionLog.js';
 
 export {
   User,
@@ -15,5 +16,6 @@ export {
   Task,
   Email,
   Attachment,
-  BackendConfig
+  BackendConfig,
+  ExecutionLog
 };

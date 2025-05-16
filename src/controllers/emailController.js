@@ -85,8 +85,9 @@ export const createEmail = async (req, res) => {
     
     // Créer automatiquement une tâche associée à cet email si nécessaire
     // Cette logique pourrait être déplacée dans un service dédié
-    const task = new Task({
+    const task = await Task.create({
       user: req.user.id,
+      flow: req.body.flow || req.user.defaultFlow, // Utiliser le flow par défaut de l'utilisateur ou celui fourni
       type: 'email_processing',
       description: `Traiter l'email: ${subject}`,
       source: 'email',
@@ -99,7 +100,7 @@ export const createEmail = async (req, res) => {
       })) : []
     });
     
-    await task.save();
+    // Task.create() sauvegarde déjà la tâche, pas besoin de save() supplémentaire
     
     // Récupérer l'email avec les pièces jointes pour la réponse
     const emailWithAttachments = await Email.findById(createdEmail._id)

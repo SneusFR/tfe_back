@@ -7,6 +7,7 @@ import taskRoutes from './taskRoutes.js';
 import emailRoutes from './emailRoutes.js';
 import attachmentRoutes from './attachmentRoutes.js';
 import backendConfigRoutes from './backendConfigRoutes.js';
+import executionLogRoutes from './executionLogRoutes.js';
 
 export {
   authRoutes,
@@ -17,5 +18,6 @@ export {
   taskRoutes,
   emailRoutes,
   attachmentRoutes,
-  backendConfigRoutes
+  backendConfigRoutes,
+  executionLogRoutes
 };
