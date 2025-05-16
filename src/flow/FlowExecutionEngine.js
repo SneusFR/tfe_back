@@ -4,7 +4,7 @@
 import axios from 'axios';
 import { http } from './httpLogger.js';
 import { createWorker } from 'tesseract.js';
-import flowLog from './flowLogger.js';
+import flowLog from './flowLogWrapper.js';
 
 // Create an axios instance
 const api = axios.create({
@@ -18,6 +18,9 @@ class FlowExecutionEngine {
     this.executionContext = new Map(); // Stores data during execution
     this.baseApiUrl = 'http://localhost:5171'; // Backend API base URL
     this.backendConfig = null;
+    
+    // Make execution context available globally for logging
+    global.__executionContext = this.executionContext;
     
     flowLog.info(`Flow Execution Engine initialized`, {
       baseApiUrl: this.baseApiUrl,
@@ -92,6 +95,14 @@ class FlowExecutionEngine {
 
   // Execute a flow for a given task
   async executeFlow(task) {
+    // Store the task in the execution context
+    this.executionContext.set('task', task);
+    
+    // Make sure the flowId is available globally for logging
+    if (task && task.flow) {
+      global.__currentFlowId = task.flow;
+    }
+    
     flowLog.startExecution(task.id, task.type);
     flowLog.info(`Task details`, { 
       taskId: task.id, 

@@ -8,10 +8,14 @@ const router = express.Router();
 const { protect } = authMiddleware;
 const { asyncHandler } = errorMiddleware;
 
-router.post('/execute',
+router.post('/:flowId/execute',
   protect, // ou retire si exécution publique
   asyncHandler(async (req, res) => {
+    const { flowId } = req.params;
     const { nodes, edges, task, backendConfig, backendConfigId } = req.body;
+    
+    // Make flowId available globally for logging
+    global.__currentFlowId = flowId;
     
     // Log the incoming request
     flowLog.info(`Flow execution request received`, {

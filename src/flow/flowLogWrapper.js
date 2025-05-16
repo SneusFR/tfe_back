@@ -1,9 +1,10 @@
 // src/flow/flowLogWrapper.js
-import logPersist from './logPersist.js';
-import flowLog from './flowLogger.js';
+import bareLogger from './flowLogger.js';   // le logger d'origine (avec *toutes* les méthodes)
+import logPersist from './logPersist.js';  // les méthodes enrichies & persistance Mongo
 
-// Export the original flowLog as a fallback
-export { flowLog };
+// On crée un proxy qui commence par le logger d'origine
+// puis écrase/étend avec les méthodes de persistance
+const merged = { ...bareLogger, ...logPersist };
 
-// Export logPersist as the default export to replace flowLog
-export default logPersist;
+export default merged;       // ← c'est celui-là qu'on importe partout
+export { bareLogger as flowLogCore }; // (optionnel) accès direct au logger "sec" si besoin
