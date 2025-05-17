@@ -352,6 +352,26 @@ class FlowExecutionEngine {
       return node.data.text;
     }
     
+    // For API node body field connections
+    if (handleId.startsWith('body-') && node.type === 'apiNode') {
+      const fieldName = handleId.replace('body-', '');
+      // Check if there's a value in the execution context for this field
+      const fieldValue = this.executionContext.get(`body-${fieldName}`);
+      if (fieldValue !== undefined) {
+        flowLog.debug(`Getting body field ${fieldName} from execution context: ${fieldValue}`);
+        return fieldValue;
+      }
+      
+      // If not in execution context, check if it's in the default body
+      if (node.data.defaultBody && node.data.defaultBody[fieldName] !== undefined) {
+        flowLog.debug(`Getting body field ${fieldName} from default body: ${node.data.defaultBody[fieldName]}`);
+        return node.data.defaultBody[fieldName];
+      }
+      
+      flowLog.debug(`No value found for body field ${fieldName}`);
+      return undefined;
+    }
+    
     // Default: return the node's general output
     return this.executionContext.get(`output-${node.id}`);
   }
@@ -472,8 +492,8 @@ class FlowExecutionEngine {
       
       // Build request body if needed
       let requestBody = null;
-      if (['post', 'put', 'patch'].includes(method) && node.data.requestBody) {
-        // Get request body from execution context
+      if (['post', 'put', 'patch'].includes(method)) {
+        // First check if there's a complete request body provided
         requestBody = this.executionContext.get('param-body');
         
         // If not found in execution context, check if there's a direct connection to the body parameter
@@ -506,7 +526,29 @@ class FlowExecutionEngine {
           }
         }
         
-        if (requestBody !== undefined) {
+        // If no complete body was found, try to build it from individual field connections
+        if (requestBody === undefined && node.data.bodySchema) {
+          requestBody = {};
+          let hasAnyField = false;
+          
+          // Build the request body from individual field connections
+          hasAnyField = this.buildRequestBodyFromConnections(node, requestBody);
+          
+          // If no fields were found, set requestBody back to null
+          if (!hasAnyField) {
+            requestBody = null;
+          }
+        }
+        
+        // Use default body values for any missing fields if available
+        if (requestBody && node.data.defaultBody) {
+          requestBody = {
+            ...node.data.defaultBody,
+            ...requestBody
+          };
+        }
+        
+        if (requestBody !== undefined && requestBody !== null) {
           flowLog.debug(`Using request body for ${method.toUpperCase()} request`, { requestBody });
         } else {
           flowLog.warn(`No request body found for ${method.toUpperCase()} request`);
@@ -908,6 +950,120 @@ class FlowExecutionEngine {
     }
   }
 
+  // Build request body from individual field connections
+  buildRequestBodyFromConnections(node, requestBody = {}) {
+    let hasAnyField = false;
+    
+    if (!node.data.bodySchema) {
+      return hasAnyField;
+    }
+    
+    // Process properties if they exist
+    if (node.data.bodySchema.properties) {
+      // Get the body fields from the schema
+      const bodyFields = Object.keys(node.data.bodySchema.properties);
+      
+      // For each field in the schema, check if there's a connection to it
+      for (const fieldName of bodyFields) {
+        // Find edges that target this body field's handle
+        const targetHandleId = `body-${fieldName}`;
+        const incomingEdges = this.edges.filter(edge => 
+          edge.target === node.id && edge.targetHandle === targetHandleId
+        );
+        
+        if (incomingEdges.length > 0) {
+          // Get the source node and handle
+          const sourceEdge = incomingEdges[0];
+          const sourceNode = this.nodes.find(n => n.id === sourceEdge.source);
+          
+          if (sourceNode) {
+            // Get data from the source node's handle
+            const fieldValue = this.getDataForHandle(sourceNode, sourceEdge.sourceHandle);
+            
+            if (fieldValue !== undefined) {
+              // Get the field schema to determine the type
+              const fieldSchema = node.data.bodySchema.properties[fieldName];
+              
+              // Convert the value to the appropriate type based on the schema
+              const convertedValue = this.convertValueToType(fieldValue, fieldSchema);
+              
+              // Add the field to the request body
+              requestBody[fieldName] = convertedValue;
+              hasAnyField = true;
+              flowLog.debug(`Added field ${fieldName} to request body with value: ${convertedValue}`);
+            }
+          }
+        }
+      }
+    }
+    
+    return hasAnyField;
+  }
+  
+  // Convert a value to the appropriate type based on the schema
+  convertValueToType(value, schema) {
+    if (!schema || !schema.type) {
+      return value;
+    }
+    
+    try {
+      switch (schema.type.toLowerCase()) {
+        case 'integer':
+          // Convert to integer
+          return parseInt(value, 10);
+          
+        case 'number':
+          // Convert to number
+          return parseFloat(value);
+          
+        case 'boolean':
+          // Convert to boolean
+          if (typeof value === 'string') {
+            const lowerValue = value.toLowerCase();
+            return lowerValue === 'true' || lowerValue === '1' || lowerValue === 'yes';
+          }
+          return Boolean(value);
+          
+        case 'array':
+          // Convert to array if it's not already
+          if (!Array.isArray(value)) {
+            if (typeof value === 'string') {
+              // Try to parse as JSON array
+              try {
+                const parsed = JSON.parse(value);
+                return Array.isArray(parsed) ? parsed : [value];
+              } catch (e) {
+                // If parsing fails, split by comma
+                return value.split(',').map(item => item.trim());
+              }
+            }
+            return [value];
+          }
+          return value;
+          
+        case 'object':
+          // Convert to object if it's not already
+          if (typeof value === 'string') {
+            try {
+              return JSON.parse(value);
+            } catch (e) {
+              flowLog.warn(`Failed to parse string as object: ${value}`);
+              return value;
+            }
+          }
+          return value;
+          
+        case 'string':
+        default:
+          // Ensure it's a string
+          return String(value);
+      }
+    } catch (error) {
+      flowLog.warn(`Error converting value to type ${schema.type}: ${error.message}`);
+      return value; // Return original value if conversion fails
+    }
+  }
+  
   setBackendConfig(cfg) {
     this.backendConfig = cfg;
     
