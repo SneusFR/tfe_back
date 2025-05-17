@@ -404,10 +404,20 @@ class FlowExecutionEngine {
       hasRequestBody: !!node.data.requestBody
     });
     
+    // Declare variables outside try block so they're accessible in catch
+    let method;
+    let url;
+    let startTime;
+    let response;
+    let axiosInstance;
+    let requestBody = null;
+    let queryParams = {};
+    let hdrs = {};
+    
     try {
       // Build the request configuration
-      const method = node.data.method.toLowerCase();
-      let url = node.data.path;
+      method = node.data.method.toLowerCase();
+      url = node.data.path;
       
       // Replace path parameters with values from the execution context
       if (node.data.parameters) {
@@ -558,17 +568,17 @@ class FlowExecutionEngine {
       // Execute the API request
       // Préparer les en-têtes par défaut
       const cfg = this.backendConfig ?? {};
-      const hdrs = {
+      hdrs = {
         'Content-Type': 'application/json',
         ...(cfg.defaultHeaders?.reduce((o, h) => ({ ...o, [h.key]: h.value }), {}))
       };
       
       flowLog.apiRequest(node.id, method.toUpperCase(), url, hdrs, requestBody);
       
-      const startTime = Date.now();
+      startTime = Date.now();
       
       // Déterminer quelle instance axios utiliser
-      const axiosInstance = url.startsWith(this.backendConfig?.baseUrl) ? api : http;
+      axiosInstance = url.startsWith(this.backendConfig?.baseUrl) ? api : http;
       
       
       // Appliquer l'authentification selon le type configuré
@@ -624,7 +634,7 @@ class FlowExecutionEngine {
       }
       
       // Exécuter la requête avec la configuration complète
-      const response = await axiosInstance({
+      response = await axiosInstance({
         method,
         baseURL: cfg.baseUrl,
         url,
@@ -647,8 +657,9 @@ class FlowExecutionEngine {
       
       return response.data;
     } catch (error) {
-      const responseTime = Date.now() - startTime;
-      flowLog.apiError(node.id, method.toUpperCase(), url, error, responseTime);
+      // Calculate response time only if startTime is defined
+      const responseTime = startTime ? Date.now() - startTime : 0;
+      flowLog.apiError(node.id, method ? method.toUpperCase() : 'UNKNOWN', url || 'UNKNOWN_URL', error, responseTime);
       throw new Error(`API request failed: ${error.message}`);
     }
   }
@@ -871,6 +882,12 @@ class FlowExecutionEngine {
   async executeOcrNode(node) {
     flowLog.info(`Executing OCR node: ${node.id}`);
     
+    // Declare variables outside try block so they're accessible in catch
+    let startTime;
+    let worker;
+    let result;
+    let processingTimeMs;
+    
     try {
       // Get OCR attributes from the node or from the execution context
       const ocrAttributes = node.data.ocrAttributes || {};
@@ -894,13 +911,13 @@ class FlowExecutionEngine {
       });
       
       // Create a Tesseract worker
-      const worker = await createWorker(language !== 'auto' ? language : undefined);
+      worker = await createWorker(language !== 'auto' ? language : undefined);
       
       // Process the image with Tesseract.js directly using the data URL
       // No need to fetch external URLs anymore
-      const startTime = Date.now();
-      const result = await worker.recognize(attachment_data);
-      const processingTimeMs = Date.now() - startTime;
+      startTime = Date.now();
+      result = await worker.recognize(attachment_data);
+      processingTimeMs = startTime ? Date.now() - startTime : 0;
       
       // Terminate the worker to free up resources
       await worker.terminate();
