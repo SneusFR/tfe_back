@@ -87,11 +87,22 @@ router.post('/:flowId/execute',
         success: result.success
       });
     } else {
-      flowLog.error(`Flow execution failed`, new Error(result.error), {
+      // Create a more detailed error object for logging
+      const detailedError = new Error(result.error);
+      
+      // Add additional properties to the error object for better logging
+      detailedError.taskId = task.id;
+      detailedError.taskType = task.type;
+      detailedError.flowId = flowId;
+      
+      // Log the detailed error
+      flowLog.error(`Flow execution failed`, detailedError, {
         taskId: task.id,
         taskType: task.type,
         success: result.success,
-        error: result.error
+        error: result.error,
+        // Include the full error message in the payload for better frontend display
+        errorDetails: result.error
       });
     }
     

@@ -660,7 +660,79 @@ class FlowExecutionEngine {
       // Calculate response time only if startTime is defined
       const responseTime = startTime ? Date.now() - startTime : 0;
       flowLog.apiError(node.id, method ? method.toUpperCase() : 'UNKNOWN', url || 'UNKNOWN_URL', error, responseTime);
-      throw new Error(`API request failed: ${error.message}`);
+      
+      // Create a more detailed error message
+      let detailedErrorMessage = `API request failed: ${error.message}`;
+      let errorDetails = {};
+      
+      // Add HTTP status code if available
+      if (error.response && error.response.status) {
+        const statusText = error.response.statusText || this.getHttpStatusText(error.response.status);
+        detailedErrorMessage = `API request failed with status code ${error.response.status} (${statusText})`;
+        errorDetails.status = error.response.status;
+        errorDetails.statusText = statusText;
+        
+        // Add error details from response body if available
+        if (error.response.data) {
+          if (typeof error.response.data === 'string') {
+            detailedErrorMessage += `: ${error.response.data}`;
+            errorDetails.errorMessage = error.response.data;
+          } else if (typeof error.response.data === 'object') {
+            // Extract error message from common API error response formats
+            const errorMessage = 
+              error.response.data.message || 
+              error.response.data.error || 
+              error.response.data.errorMessage ||
+              (error.response.data.errors && JSON.stringify(error.response.data.errors)) ||
+              JSON.stringify(error.response.data);
+            
+            detailedErrorMessage += `: ${errorMessage}`;
+            errorDetails.errorData = error.response.data;
+          }
+        }
+      }
+      
+      // Add request details
+      detailedErrorMessage += `\nRequest: ${method?.toUpperCase() || 'UNKNOWN'} ${url || 'UNKNOWN_URL'}`;
+      errorDetails.method = method?.toUpperCase() || 'UNKNOWN';
+      errorDetails.url = url || 'UNKNOWN_URL';
+      
+      // Add request body if available for debugging (only for non-production environments)
+      if (process.env.NODE_ENV !== 'production' && requestBody) {
+        try {
+          const bodyPreview = typeof requestBody === 'object' ? 
+            JSON.stringify(requestBody).substring(0, 200) : 
+            String(requestBody).substring(0, 200);
+          
+          detailedErrorMessage += `\nRequest Body: ${bodyPreview}${bodyPreview.length >= 200 ? '...' : ''}`;
+          errorDetails.requestBody = requestBody;
+        } catch (e) {
+          // Ignore stringification errors
+        }
+      }
+      
+      // Add headers to error details (excluding sensitive information)
+      if (hdrs) {
+        const safeHeaders = { ...hdrs };
+        // Remove sensitive headers
+        delete safeHeaders.Authorization;
+        delete safeHeaders.authorization;
+        delete safeHeaders.Cookie;
+        delete safeHeaders.cookie;
+        
+        errorDetails.headers = safeHeaders;
+      }
+      
+      // Log the detailed error with all the information
+      flowLog.error(`API request failed with detailed information`, new Error(detailedErrorMessage), {
+        nodeId: node.id,
+        method: method?.toUpperCase() || 'UNKNOWN',
+        url: url || 'UNKNOWN_URL',
+        status: error.response?.status,
+        errorDetails: errorDetails
+      });
+      
+      throw new Error(detailedErrorMessage);
     }
   }
 
@@ -1095,6 +1167,85 @@ class FlowExecutionEngine {
     } else {
       flowLog.warn(`Backend configuration cleared or set to null`);
     }
+  }
+  
+  // Helper method to get HTTP status text from status code
+  getHttpStatusText(statusCode) {
+    const statusTexts = {
+      // 1xx Informational
+      100: 'Continue',
+      101: 'Switching Protocols',
+      102: 'Processing',
+      103: 'Early Hints',
+      
+      // 2xx Success
+      200: 'OK',
+      201: 'Created',
+      202: 'Accepted',
+      203: 'Non-Authoritative Information',
+      204: 'No Content',
+      205: 'Reset Content',
+      206: 'Partial Content',
+      207: 'Multi-Status',
+      208: 'Already Reported',
+      226: 'IM Used',
+      
+      // 3xx Redirection
+      300: 'Multiple Choices',
+      301: 'Moved Permanently',
+      302: 'Found',
+      303: 'See Other',
+      304: 'Not Modified',
+      305: 'Use Proxy',
+      307: 'Temporary Redirect',
+      308: 'Permanent Redirect',
+      
+      // 4xx Client Errors
+      400: 'Bad Request',
+      401: 'Unauthorized',
+      402: 'Payment Required',
+      403: 'Forbidden',
+      404: 'Not Found',
+      405: 'Method Not Allowed',
+      406: 'Not Acceptable',
+      407: 'Proxy Authentication Required',
+      408: 'Request Timeout',
+      409: 'Conflict',
+      410: 'Gone',
+      411: 'Length Required',
+      412: 'Precondition Failed',
+      413: 'Payload Too Large',
+      414: 'URI Too Long',
+      415: 'Unsupported Media Type',
+      416: 'Range Not Satisfiable',
+      417: 'Expectation Failed',
+      418: 'I\'m a Teapot',
+      421: 'Misdirected Request',
+      422: 'Unprocessable Entity',
+      423: 'Locked',
+      424: 'Failed Dependency',
+      425: 'Too Early',
+      426: 'Upgrade Required',
+      428: 'Precondition Required',
+      429: 'Too Many Requests',
+      431: 'Request Header Fields Too Large',
+      451: 'Unavailable For Legal Reasons',
+      
+      // 5xx Server Errors
+      500: 'Internal Server Error',
+      501: 'Not Implemented',
+      502: 'Bad Gateway',
+      503: 'Service Unavailable',
+      504: 'Gateway Timeout',
+      505: 'HTTP Version Not Supported',
+      506: 'Variant Also Negotiates',
+      507: 'Insufficient Storage',
+      508: 'Loop Detected',
+      510: 'Not Extended',
+      511: 'Network Authentication Required'
+    };
+    
+    return statusTexts[statusCode] || 'Unknown Status';
   }
 }
 

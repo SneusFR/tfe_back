@@ -100,14 +100,43 @@ export const getExecutionLogs = asyncHandler(async (req, res) => {
     .lean();
   
   // Format response
-  const formattedLogs = logs.map(log => ({
-    timestamp: log.createdAt,
-    level: log.level,
-    nodeId: log.nodeId,
-    nodeType: log.nodeType,
-    message: log.message,
-    payload: truncatePayload(log.payload)
-  }));
+  const formattedLogs = logs.map(log => {
+    // Create the base log object
+    const formattedLog = {
+      timestamp: log.createdAt,
+      level: log.level,
+      nodeId: log.nodeId,
+      nodeType: log.nodeType,
+      message: log.message
+    };
+    
+    // Handle payload differently based on log level and content
+    if (log.level === 'error') {
+      // For error logs, extract and format detailed error information
+      if (log.payload) {
+        // Include the error message
+        formattedLog.error = log.payload.error;
+        
+        // Include error details if available
+        if (log.payload.errorDetails) {
+          formattedLog.errorDetails = log.payload.errorDetails;
+        }
+        
+        // Include stack trace in development environment
+        if (process.env.NODE_ENV !== 'production' && log.payload.stack) {
+          formattedLog.stack = log.payload.stack;
+        }
+      }
+      
+      // Still include the full payload (truncated) for debugging
+      formattedLog.payload = truncatePayload(log.payload);
+    } else {
+      // For non-error logs, just include the truncated payload
+      formattedLog.payload = truncatePayload(log.payload);
+    }
+    
+    return formattedLog;
+  });
   
   res.json({
     page,
