@@ -5,6 +5,7 @@ import axios from 'axios';
 import { http } from './httpLogger.js';
 import { createWorker } from 'tesseract.js';
 import flowLog from './flowLogWrapper.js';
+import { ExecutionLog } from '../models/index.js';
 
 // Create an axios instance
 const api = axios.create({
@@ -243,6 +244,12 @@ class FlowExecutionEngine {
       case 'consoleLogNode':
         outputData = await this.executeConsoleLogNode(node);
         break;
+      case 'aiNode':
+        outputData = await this.executeAiNode(node);
+        break;
+      case 'conditionalFlowNode':
+        outputData = await this.executeConditionalFlowNode(node);
+        break;
       default:
         flowLog.warn(`Unknown node type: ${node.type}`);
         outputData = null;
@@ -290,17 +297,55 @@ class FlowExecutionEngine {
     
     // Process each execution edge
     const results = [];
-    for (const edge of executionEdges) {
-      const targetNode = this.nodes.find(n => n.id === edge.target);
-      if (targetNode) {
-      flowLog.info(`Following execution link to node: ${targetNode.id}`, {
-        sourceNodeId: node.id,
-        targetNodeId: targetNode.id,
-        edgeType: 'execution'
+    
+    // Special handling for conditionalFlowNode to follow the correct path
+    if (node.type === 'conditionalFlowNode') {
+      // Get the condition result (true, false, or default)
+      const conditionResult = this.executionContext.get(`${node.id}-condition-result`);
+      
+      // Find the edge that corresponds to the condition result
+      const matchingEdges = executionEdges.filter(edge => {
+        // Check if the sourceHandle matches the condition result
+        return edge.sourceHandle === `execution-${conditionResult}`;
       });
-        // Execute the target node
-        const result = await this.executeNode(targetNode);
-        results.push(result);
+      
+      // Follow the matching edge if found
+      if (matchingEdges.length > 0) {
+        for (const edge of matchingEdges) {
+          const targetNode = this.nodes.find(n => n.id === edge.target);
+          if (targetNode) {
+            flowLog.info(`Following conditional execution path "${conditionResult}" to node: ${targetNode.id}`, {
+              sourceNodeId: node.id,
+              targetNodeId: targetNode.id,
+              conditionResult: conditionResult,
+              edgeType: 'execution'
+            });
+            // Execute the target node
+            const result = await this.executeNode(targetNode);
+            results.push(result);
+          }
+        }
+      } else {
+        flowLog.warn(`No matching execution path found for condition result "${conditionResult}"`, {
+          nodeId: node.id,
+          conditionResult: conditionResult,
+          availablePaths: executionEdges.map(e => e.sourceHandle)
+        });
+      }
+    } else {
+      // Standard execution for other node types
+      for (const edge of executionEdges) {
+        const targetNode = this.nodes.find(n => n.id === edge.target);
+        if (targetNode) {
+          flowLog.info(`Following execution link to node: ${targetNode.id}`, {
+            sourceNodeId: node.id,
+            targetNodeId: targetNode.id,
+            edgeType: 'execution'
+          });
+          // Execute the target node
+          const result = await this.executeNode(targetNode);
+          results.push(result);
+        }
       }
     }
     
@@ -345,6 +390,19 @@ class FlowExecutionEngine {
     // For OCR node output
     if (handleId === 'output-text' && node.type === 'ocrNode') {
       return this.executionContext.get(`${node.id}-output-text`);
+    }
+    
+    // For AI node output
+    if (handleId === 'attr-output' && node.type === 'aiNode') {
+      return this.executionContext.get(`${node.id}-output`);
+    }
+    
+    // For conditional flow node output
+    if (node.type === 'conditionalFlowNode') {
+      // Return the condition result for the output handle
+      if (handleId === 'output-result') {
+        return this.executionContext.get(`${node.id}-condition-result`);
+      }
     }
     
     // For text node output
@@ -844,6 +902,7 @@ class FlowExecutionEngine {
       // Make the API request to Unipile
       const unipileBaseUrl = process.env.UNIPILE_BASE_URL;
       const unipileApiKey = process.env.UNIPILE_EMAIL_API_KEY;
+      const OpenaiKey = process.env.OPENAI_API_KEY;
       
       const response = await axios({
         method: 'post',
@@ -1036,6 +1095,423 @@ class FlowExecutionEngine {
     } catch (error) {
       flowLog.error(`Failed to execute console.log node`, error);
       return { logged: false, error: error.message };
+    }
+  }
+  
+  // Execute a conditional flow node
+  async executeConditionalFlowNode(node) {
+    flowLog.info(`Executing conditional flow node: ${node.id}`, {
+      nodeId: node.id,
+      conditionType: node.data.conditionType,
+      inputValue: node.data.inputValue,
+      compareValue: node.data.value
+    });
+    
+    try {
+      // Get the condition type and values from the node data or from the execution context
+      const conditionType = node.data.conditionType;
+      
+      // Get the input value (the value to check)
+      let inputValue = this.executionContext.get('value-input') || node.data.inputValue;
+      
+      // Get the comparison value (what to compare against)
+      let compareValue = this.executionContext.get('compare-input') || node.data.value;
+      
+      // Log the values being compared
+      flowLog.debug(`Evaluating condition: ${conditionType}`, {
+        inputValue,
+        compareValue
+      });
+      
+      // Determine the result of the condition (true, false, or default)
+      let conditionResult = 'default'; // Default path if evaluation fails
+      
+      // Evaluate the condition based on the condition type
+      try {
+        switch (conditionType) {
+          case 'equals':
+            conditionResult = inputValue === compareValue ? 'true' : 'false';
+            break;
+            
+          case 'notEquals':
+            conditionResult = inputValue !== compareValue ? 'true' : 'false';
+            break;
+            
+          case 'contains':
+            conditionResult = String(inputValue).includes(String(compareValue)) ? 'true' : 'false';
+            break;
+            
+          case 'notContains':
+            conditionResult = !String(inputValue).includes(String(compareValue)) ? 'true' : 'false';
+            break;
+            
+          case 'greaterThan':
+            conditionResult = Number(inputValue) > Number(compareValue) ? 'true' : 'false';
+            break;
+            
+          case 'lessThan':
+            conditionResult = Number(inputValue) < Number(compareValue) ? 'true' : 'false';
+            break;
+            
+          case 'greaterOrEqual':
+            conditionResult = Number(inputValue) >= Number(compareValue) ? 'true' : 'false';
+            break;
+            
+          case 'lessOrEqual':
+            conditionResult = Number(inputValue) <= Number(compareValue) ? 'true' : 'false';
+            break;
+            
+          case 'startsWith':
+            conditionResult = String(inputValue).startsWith(String(compareValue)) ? 'true' : 'false';
+            break;
+            
+          case 'endsWith':
+            conditionResult = String(inputValue).endsWith(String(compareValue)) ? 'true' : 'false';
+            break;
+            
+          case 'isEmpty':
+            conditionResult = (inputValue === undefined || inputValue === null || inputValue === '' || 
+                              (Array.isArray(inputValue) && inputValue.length === 0) ||
+                              (typeof inputValue === 'object' && Object.keys(inputValue).length === 0)) ? 'true' : 'false';
+            break;
+            
+          case 'isNotEmpty':
+            conditionResult = (inputValue !== undefined && inputValue !== null && inputValue !== '' && 
+                              !(Array.isArray(inputValue) && inputValue.length === 0) &&
+                              !(typeof inputValue === 'object' && Object.keys(inputValue).length === 0)) ? 'true' : 'false';
+            break;
+            
+          case 'isTrue':
+            conditionResult = (inputValue === true || inputValue === 'true' || inputValue === 1 || inputValue === '1') ? 'true' : 'false';
+            break;
+            
+          case 'isFalse':
+            conditionResult = (inputValue === false || inputValue === 'false' || inputValue === 0 || inputValue === '0') ? 'true' : 'false';
+            break;
+            
+          default:
+            flowLog.warn(`Unknown condition type: ${conditionType}, using default path`);
+            conditionResult = 'default';
+        }
+      } catch (error) {
+        // If there's an error in the condition evaluation, use the default path
+        flowLog.error(`Error evaluating condition: ${error.message}`, error, {
+          conditionType,
+          inputValue,
+          compareValue
+        });
+        conditionResult = 'default';
+        
+        // Log the error to ExecutionLog
+        const task = this.executionContext.get('task');
+        const flowId = task?.flow || global.__currentFlowId;
+        const taskId = task?.id;
+        
+        if (flowId && taskId) {
+          void ExecutionLog.create({
+            taskId: taskId,
+            flowId: flowId,
+            level: 'error',
+            nodeId: node.id,
+            nodeType: 'conditionalFlowNode',
+            message: `Condition evaluation failed: ${error.message}`,
+            payload: {
+              event: 'condition_evaluation_error',
+              conditionType,
+              inputValue,
+              compareValue,
+              error: error.message,
+              stack: error.stack
+            }
+          }).catch(err => {
+            console.error('Failed to persist condition evaluation log to MongoDB:', err);
+          });
+        }
+      }
+      
+      // Store the condition result in the execution context
+      this.executionContext.set(`${node.id}-condition-result`, conditionResult);
+      
+      // Log the condition result
+      flowLog.info(`Condition evaluation result: ${conditionResult}`, {
+        nodeId: node.id,
+        conditionType,
+        inputValue,
+        compareValue,
+        result: conditionResult
+      });
+      
+      // Log the condition result to ExecutionLog
+      const task = this.executionContext.get('task');
+      const flowId = task?.flow || global.__currentFlowId;
+      const taskId = task?.id;
+      
+      if (flowId && taskId) {
+        void ExecutionLog.create({
+          taskId: taskId,
+          flowId: flowId,
+          level: 'info',
+          nodeId: node.id,
+          nodeType: 'conditionalFlowNode',
+          message: `Condition evaluated: ${conditionType}`,
+          payload: {
+            event: 'condition_evaluated',
+            conditionType,
+            inputValue,
+            compareValue,
+            result: conditionResult
+          }
+        }).catch(err => {
+          console.error('Failed to persist condition evaluation log to MongoDB:', err);
+        });
+      }
+      
+      // Return the condition result
+      return {
+        conditionType,
+        inputValue,
+        compareValue,
+        result: conditionResult
+      };
+    } catch (error) {
+      flowLog.error(`Failed to execute conditional flow node`, error, {
+        nodeId: node.id
+      });
+      
+      // Log the error to ExecutionLog
+      const task = this.executionContext.get('task');
+      const flowId = task?.flow || global.__currentFlowId;
+      const taskId = task?.id;
+      
+      if (flowId && taskId) {
+        void ExecutionLog.create({
+          taskId: taskId,
+          flowId: flowId,
+          level: 'error',
+          nodeId: node.id,
+          nodeType: 'conditionalFlowNode',
+          message: `Conditional flow node execution failed: ${error.message}`,
+          payload: {
+            event: 'conditional_flow_node_error',
+            error: error.message,
+            stack: error.stack
+          }
+        }).catch(err => {
+          console.error('Failed to persist conditional flow node error log to MongoDB:', err);
+        });
+      }
+      
+      // Set default path in case of error
+      this.executionContext.set(`${node.id}-condition-result`, 'default');
+      
+      return { 
+        error: error.message,
+        result: 'default'
+      };
+    }
+  }
+  
+  // Execute an AI node
+  async executeAiNode(node) {
+    flowLog.info(`Executing AI node: ${node.id}`);
+    
+    // Declare variables outside try block so they're accessible in catch
+    let startTime;
+    let processingTimeMs;
+    let prompt;
+    let input;
+    let aiResponse;
+    
+    try {
+      // Get values from node data or from the execution context
+      prompt = this.executionContext.get('attr-prompt') || node.data.prompt;
+      input = this.executionContext.get('attr-input') || node.data.input || '';
+      
+      // Validate required parameters
+      if (!prompt) {
+        const error = new Error('Missing required parameter: prompt');
+        flowLog.error(`Missing required parameter: prompt`, error, {
+          nodeId: node.id,
+          nodeType: 'aiNode'
+        });
+        
+        // Log detailed error information to ExecutionLog
+        const task = this.executionContext.get('task');
+        const flowId = task?.flow || global.__currentFlowId;
+        const taskId = task?.id;
+        
+        if (flowId && taskId) {
+          void ExecutionLog.create({
+            taskId: taskId,
+            flowId: flowId,
+            level: 'error',
+            nodeId: node.id,
+            nodeType: 'aiNode',
+            message: 'AI processing failed: Missing required parameter: prompt',
+            payload: {
+              event: 'ai_processing_error',
+              error: 'Missing required parameter: prompt'
+            }
+          }).catch(err => {
+            console.error('Failed to persist AI log to MongoDB:', err);
+          });
+        }
+        
+        return { success: false, error: 'Missing required parameter: prompt' };
+      }
+      
+      // Log the start of AI processing with detailed information
+      flowLog.info(`Processing AI request with Unipile`, {
+        nodeId: node.id,
+        promptLength: prompt ? prompt.length : 0,
+        inputLength: input ? input.length : 0,
+        promptPreview: prompt ? (prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt) : null,
+        inputPreview: input ? (input.length > 100 ? input.substring(0, 100) + '...' : input) : null
+      });
+      
+      // Log AI request details to ExecutionLog
+      const task = this.executionContext.get('task');
+      const flowId = task?.flow || global.__currentFlowId;
+      const taskId = task?.id;
+      
+      if (flowId && taskId) {
+        void ExecutionLog.create({
+          taskId: taskId,
+          flowId: flowId,
+          level: 'info',
+          nodeId: node.id,
+          nodeType: 'aiNode',
+          message: 'AI processing started',
+          payload: {
+            event: 'ai_processing_start',
+            prompt: prompt,
+            input: input
+          }
+        }).catch(err => {
+          console.error('Failed to persist AI log to MongoDB:', err);
+        });
+      }
+      
+      // Make the API request to OpenAI
+      const openaiApiKey = process.env.OPENAI_API_KEY;
+      
+      // Prepare the request body
+      const requestBody = {
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: prompt
+          },
+          {
+            role: "user",
+            content: input
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000
+      };
+      
+      // Log the request (excluding sensitive information)
+      flowLog.debug(`AI request details`, {
+        model: requestBody.model,
+        promptLength: prompt.length,
+        inputLength: input ? input.length : 0,
+        temperature: requestBody.temperature,
+        max_tokens: requestBody.max_tokens
+      });
+      
+      // Record start time for performance measurement
+      startTime = Date.now();
+      
+      // Make the API request
+      const response = await axios({
+        method: 'post',
+        url: `https://api.openai.com/v1/chat/completions`,
+        data: requestBody,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openaiApiKey}`,
+        }
+      });
+      
+      // Calculate processing time
+      processingTimeMs = Date.now() - startTime;
+      
+      // Extract the AI response
+      aiResponse = response.data.choices[0].message.content;
+      
+      flowLog.info(`AI processing completed successfully`, {
+        responseLength: aiResponse ? aiResponse.length : 0,
+        processingTimeMs: processingTimeMs,
+        responsePreview: aiResponse ? (aiResponse.length > 100 ? aiResponse.substring(0, 100) + '...' : aiResponse) : null
+      });
+      
+      // Log AI response to ExecutionLog
+      if (flowId && taskId) {
+        void ExecutionLog.create({
+          taskId: taskId,
+          flowId: flowId,
+          level: 'info',
+          nodeId: node.id,
+          nodeType: 'aiNode',
+          message: 'AI processing completed successfully',
+          payload: {
+            event: 'ai_processing_complete',
+            prompt: prompt,
+            input: input,
+            output: aiResponse,
+            processingTimeMs: processingTimeMs,
+            model: requestBody.model
+          }
+        }).catch(err => {
+          console.error('Failed to persist AI log to MongoDB:', err);
+        });
+      }
+      
+      // Store the AI response in the execution context for the output handle
+      this.executionContext.set(`${node.id}-output`, aiResponse);
+      
+      // Store the AI response for the specific output handle
+      this.executionContext.set(`${node.id}-output-output`, aiResponse);
+      
+      return aiResponse;
+    } catch (error) {
+      // Calculate processing time if startTime was set
+      processingTimeMs = startTime ? Date.now() - startTime : 0;
+      
+      flowLog.error(`Failed to process AI request`, error, {
+        nodeId: node.id,
+        processingTimeMs: processingTimeMs
+      });
+      
+      // Log error to ExecutionLog
+      const task = this.executionContext.get('task');
+      const flowId = task?.flow || global.__currentFlowId;
+      const taskId = task?.id;
+      
+      if (flowId && taskId) {
+        void ExecutionLog.create({
+          taskId: taskId,
+          flowId: flowId,
+          level: 'error',
+          nodeId: node.id,
+          nodeType: 'aiNode',
+          message: `AI processing failed: ${error.message}`,
+          payload: {
+            event: 'ai_processing_error',
+            prompt: prompt,
+            input: input,
+            error: error.message,
+            stack: error.stack,
+            processingTimeMs: processingTimeMs
+          }
+        }).catch(err => {
+          console.error('Failed to persist AI log to MongoDB:', err);
+        });
+      }
+      
+      return { success: false, error: error.message };
     }
   }
 
