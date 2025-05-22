@@ -392,12 +392,87 @@ class FlowExecutionEngine {
       return this.executionContext.get(`${node.id}-output-text`);
     }
     
-    // For AI node output
-    if (handleId === 'attr-output' && node.type === 'aiNode') {
-      return this.executionContext.get(`${node.id}-output`);
+  // For AI node output
+  if (handleId === 'attr-output' && node.type === 'aiNode') {
+    return this.executionContext.get(`${node.id}-output`);
+  }
+  
+  // For mail body node output
+  if (handleId === 'output-content' && node.type === 'mailBodyNode') {
+    // Process the mail body content on-demand when requested
+    let content = node.data.content;
+    let processedContent = '';
+    
+    // If content is a JSON string (from Draft.js), parse it
+    if (content && typeof content === 'string' && content.startsWith('{')) {
+      try {
+        // Try to parse as JSON
+        const contentObj = JSON.parse(content);
+        
+        // If it's a Draft.js content state, extract the text
+        if (contentObj.blocks) {
+          // Extract plain text from Draft.js blocks
+          processedContent = contentObj.blocks.map(block => block.text).join('\n');
+          flowLog.debug(`Extracted plain text from Draft.js content for node ${node.id}`, {
+            textLength: processedContent.length,
+            preview: processedContent.length > 100 ? processedContent.substring(0, 100) + '...' : processedContent
+          });
+        }
+      } catch (e) {
+        // If parsing fails, use the content as is
+        processedContent = content;
+        flowLog.warn(`Failed to parse mail body content as JSON for node ${node.id}: ${e.message}`);
+      }
+    } else {
+      // Use the content directly if it's not JSON
+      processedContent = content || '';
     }
     
-    // For conditional flow node output
+    // Find all variables (words starting with $) and replace them with their values
+    const variableRegex = /\$([a-zA-Z][a-zA-Z0-9_]*)/g;
+    let match;
+    
+    // Create a copy of the content to replace variables
+    let finalContent = processedContent;
+    
+    // Find all variables and replace them
+    while ((match = variableRegex.exec(processedContent)) !== null) {
+      const variableName = match[1];
+      const variableValue = this.executionContext.get(`var-${variableName}`);
+      
+      if (variableValue !== undefined) {
+        // Replace the variable with its value
+        const regex = new RegExp(`\\$${variableName}`, 'g');
+        finalContent = finalContent.replace(regex, variableValue);
+        
+        flowLog.debug(`Replaced variable $${variableName} with value "${variableValue}" in mail body node ${node.id}`);
+      }
+    }
+    
+    // Cache the processed content in the execution context
+    this.executionContext.set(`${node.id}-output-content`, finalContent);
+    
+    return finalContent;
+  }
+  
+  // For mail body node variable inputs
+  if (handleId.startsWith('var-') && node.type === 'mailBodyNode') {
+    const variableName = handleId.replace('var-', '');
+    
+    // Extract the variable value from the execution context
+    const variableValue = this.executionContext.get(`var-${variableName}`);
+    
+    // If the variable has a value, return it
+    if (variableValue !== undefined) {
+      return variableValue;
+    }
+    
+    // If no value is found, return an empty string
+    // This allows the variable to be used in the template even if it doesn't have a value
+    return '';
+  }
+  
+  // For conditional flow node output
     if (node.type === 'conditionalFlowNode') {
       // Return the condition result for the output handle
       if (handleId === 'output-result') {
@@ -1308,6 +1383,113 @@ class FlowExecutionEngine {
         error: error.message,
         result: 'default'
       };
+    }
+  }
+  
+  // Execute a mail body node
+  async executeMailBodyNode(node) {
+    flowLog.info(`Executing mail body node: ${node.id}`);
+    
+    try {
+      // Get the content from the node data
+      let content = node.data.content;
+      
+      // If content is a JSON string (from Draft.js), parse it
+      if (content && typeof content === 'string' && content.startsWith('{')) {
+        try {
+          // Try to parse as JSON
+          const contentObj = JSON.parse(content);
+          
+          // If it's a Draft.js content state, extract the text
+          if (contentObj.blocks) {
+            // Extract plain text from Draft.js blocks
+            const plainText = contentObj.blocks.map(block => block.text).join('\n');
+            flowLog.debug(`Extracted plain text from Draft.js content`, {
+              textLength: plainText.length,
+              preview: plainText.length > 100 ? plainText.substring(0, 100) + '...' : plainText
+            });
+            
+            // Store the plain text version
+            this.executionContext.set(`${node.id}-plain-text`, plainText);
+            
+            // Keep the original content for rich text formatting
+            content = contentObj;
+          }
+        } catch (e) {
+          // If parsing fails, use the content as is
+          flowLog.warn(`Failed to parse mail body content as JSON: ${e.message}`);
+        }
+      }
+      
+      // Extract variables from the content (words starting with $)
+      const variables = [];
+      let plainText = '';
+      
+      if (typeof content === 'object' && content.blocks) {
+        // Extract from Draft.js content
+        plainText = content.blocks.map(block => block.text).join('\n');
+      } else if (typeof content === 'string') {
+        // Use the content directly
+        plainText = content;
+      }
+      
+      // Find all variables (words starting with $)
+      const variableRegex = /\$([a-zA-Z][a-zA-Z0-9_]*)/g;
+      const matches = [...plainText.matchAll(variableRegex)];
+      
+      // Extract unique variable names
+      const uniqueVars = [...new Set(matches.map(match => match[1]))];
+      
+      flowLog.info(`Found ${uniqueVars.length} variables in mail body content`, {
+        variables: uniqueVars
+      });
+      
+      // Store variables in the execution context
+      uniqueVars.forEach(variable => {
+        variables.push(variable);
+        
+        // Get variable value from incoming connections
+        const variableValue = this.executionContext.get(`var-${variable}`);
+        
+        // Store the variable in the execution context
+        this.executionContext.set(`${node.id}-var-${variable}`, variableValue);
+        
+        flowLog.debug(`Variable ${variable} value: ${variableValue}`);
+      });
+      
+      // Process the content by replacing variables with their values
+      let processedContent = plainText;
+      
+      // Replace variables with their values
+      uniqueVars.forEach(variable => {
+        const variableValue = this.executionContext.get(`var-${variable}`);
+        if (variableValue !== undefined) {
+          const regex = new RegExp(`\\$${variable}`, 'g');
+          processedContent = processedContent.replace(regex, variableValue);
+        }
+      });
+      
+      // Store the processed content in the execution context
+      this.executionContext.set(`${node.id}-output-content`, processedContent);
+      
+      flowLog.info(`Mail body processed successfully`, {
+        contentLength: processedContent.length,
+        variablesReplaced: uniqueVars.length,
+        preview: processedContent.length > 100 ? processedContent.substring(0, 100) + '...' : processedContent
+      });
+      
+      // Return the processed content
+      return {
+        content: processedContent,
+        originalContent: content,
+        variables: variables
+      };
+    } catch (error) {
+      flowLog.error(`Failed to process mail body`, error, {
+        nodeId: node.id
+      });
+      
+      return { success: false, error: error.message };
     }
   }
   
