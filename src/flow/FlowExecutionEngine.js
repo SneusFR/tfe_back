@@ -903,7 +903,41 @@ class FlowExecutionEngine {
       const toDisplayName = this.executionContext.get('attr-toDisplayName') || emailAttributes.toDisplayName;
       
       const subject = this.executionContext.get('attr-subject') || emailAttributes.subject;
-      const body = this.executionContext.get('attr-body') || emailAttributes.content;
+      
+      // Recherche du contenu de l'email à partir de différentes sources possibles
+      // 1. Vérifier les connexions directes au champ body
+      let body = this.executionContext.get('attr-body');
+      
+      // 2. Si pas trouvé, chercher dans les connexions entrantes pour ce nœud
+      if (body === undefined) {
+        // Trouver toutes les connexions entrantes qui ciblent ce nœud
+        const incomingEdges = this.edges.filter(edge => 
+          edge.target === node.id && 
+          (edge.targetHandle === 'attr-body' || edge.targetHandle === 'Body' || 
+           edge.targetHandle === 'body' || edge.targetHandle.toLowerCase().includes('body') ||
+           edge.targetHandle.toLowerCase().includes('content'))
+        );
+        
+        // S'il y a des connexions entrantes, prendre la valeur du premier nœud source
+        if (incomingEdges.length > 0) {
+          const sourceEdge = incomingEdges[0];
+          const sourceNode = this.nodes.find(n => n.id === sourceEdge.source);
+          
+          if (sourceNode) {
+            // Obtenir les données du handle source
+            const sourceData = this.getDataForHandle(sourceNode, sourceEdge.sourceHandle);
+            if (sourceData !== undefined) {
+              body = sourceData;
+              flowLog.debug(`Using email body content from connected node ${sourceNode.id} (type: ${sourceNode.type})`);
+            }
+          }
+        }
+      }
+      
+      // 3. Si toujours pas trouvé, utiliser la valeur par défaut
+      if (body === undefined) {
+        body = emailAttributes.content;
+      }
       
       const reply_to = this.executionContext.get('attr-reply_to') || emailAttributes.reply_to;
       const cc = this.executionContext.get('attr-cc') || emailAttributes.cc;
