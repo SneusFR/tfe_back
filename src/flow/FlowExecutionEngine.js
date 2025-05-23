@@ -1239,7 +1239,7 @@ class FlowExecutionEngine {
       try {
         switch (conditionType) {
           case 'equals':
-            conditionResult = inputValue === compareValue ? 'true' : 'false';
+            conditionResult = inputValue == compareValue ? 'true' : 'false';
             break;
             
           case 'notEquals':
@@ -1341,16 +1341,22 @@ class FlowExecutionEngine {
       // Store the condition result in the execution context
       this.executionContext.set(`${node.id}-condition-result`, conditionResult);
       
-      // Log the condition result
-      flowLog.info(`Condition evaluation result: ${conditionResult}`, {
+      // Log the condition result with detailed comparison information
+      const comparisonDetails = {
         nodeId: node.id,
         conditionType,
         inputValue,
         compareValue,
         result: conditionResult
-      });
+      };
       
-      // Log the condition result to ExecutionLog
+      // Log to console with detailed information
+      flowLog.info(`Condition evaluation result: ${conditionResult}`, comparisonDetails);
+      
+      // Create a more descriptive message that includes the comparison details
+      const detailedMessage = `Condition '${conditionType}': ${JSON.stringify(inputValue)} ${this.getConditionOperatorText(conditionType)} ${JSON.stringify(compareValue)} => ${conditionResult}`;
+      
+      // Log the condition result to ExecutionLog with detailed message
       const task = this.executionContext.get('task');
       const flowId = task?.flow || global.__currentFlowId;
       const taskId = task?.id;
@@ -1362,7 +1368,7 @@ class FlowExecutionEngine {
           level: 'info',
           nodeId: node.id,
           nodeType: 'conditionalFlowNode',
-          message: `Condition evaluated: ${conditionType}`,
+          message: detailedMessage,
           payload: {
             event: 'condition_evaluated',
             conditionType,
@@ -1842,6 +1848,27 @@ class FlowExecutionEngine {
     } catch (error) {
       flowLog.warn(`Error converting value to type ${schema.type}: ${error.message}`);
       return value; // Return original value if conversion fails
+    }
+  }
+  
+  // Helper method to convert condition type to readable operator text
+  getConditionOperatorText(conditionType) {
+    switch (conditionType) {
+      case 'equals': return '===';
+      case 'notEquals': return '!==';
+      case 'contains': return 'contains';
+      case 'notContains': return 'does not contain';
+      case 'greaterThan': return '>';
+      case 'lessThan': return '<';
+      case 'greaterOrEqual': return '>=';
+      case 'lessOrEqual': return '<=';
+      case 'startsWith': return 'starts with';
+      case 'endsWith': return 'ends with';
+      case 'isEmpty': return 'is empty';
+      case 'isNotEmpty': return 'is not empty';
+      case 'isTrue': return 'is true';
+      case 'isFalse': return 'is false';
+      default: return conditionType;
     }
   }
   
