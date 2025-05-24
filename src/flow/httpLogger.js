@@ -184,7 +184,10 @@ http.interceptors.response.use(
       data: error.response?.data
     };
     
-    logger.error({
+    // Log the error with appropriate level (warn for 404, error for others)
+    const logLevel = error.response?.status === 404 ? 'warn' : 'error';
+    
+    logger[logLevel]({
       type: 'error',
       error: maskedError,
       url: error.config?.url,
@@ -192,7 +195,14 @@ http.interceptors.response.use(
       responseTime: Date.now() - (error.config?.metadata?.startTime || 0)
     });
     
-    console.log('❌', error?.response?.status ?? '-', error.config?.url, error.message);
+    // For 404 errors, log with a different icon to indicate it's not a critical error
+    if (error.response?.status === 404) {
+      console.log('⚠️', error.response.status, error.config?.url, 'Not Found (non-blocking)');
+    } else {
+      console.log('❌', error?.response?.status ?? '-', error.config?.url, error.message);
+    }
+    
+    // We still throw the error as the FlowExecutionEngine will handle 404s specially
     throw error;
   }
 );

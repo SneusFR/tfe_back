@@ -265,14 +265,18 @@ class FlowExecutionEngine {
         // Store the complete response
         this.executionContext.set(`${node.id}-output`, outputData);
         
-      // Store specific parts of the response for the new output handles
+        // Store specific parts of the response for the new output handles
         this.executionContext.set(`${node.id}-output-response`, outputData);
         this.executionContext.set(`${node.id}-output-body`, outputData); // For API responses, the data is usually the body
-        this.executionContext.set(`${node.id}-output-status`, 200); // Default to 200 for mock responses
+        
+        // Only set the status code if it hasn't been set already (e.g., by the 404 handler)
+        if (!this.executionContext.has(`${node.id}-output-status`)) {
+          this.executionContext.set(`${node.id}-output-status`, 200); // Default to 200 only for successful responses
+          flowLog.contextUpdate(`${node.id}-output-status`, 200);
+        }
         
         flowLog.contextUpdate(`${node.id}-output-response`, outputData);
         flowLog.contextUpdate(`${node.id}-output-body`, outputData);
-        flowLog.contextUpdate(`${node.id}-output-status`, 200);
       }
     }
     
@@ -822,6 +826,24 @@ class FlowExecutionEngine {
             detailedErrorMessage += `: ${errorMessage}`;
             errorDetails.errorData = error.response.data;
           }
+        }
+        
+        // Special handling for 404 errors - don't throw an exception, return the response data and status
+        if (error.response.status === 404) {
+          flowLog.info(`API request returned 404 Not Found - continuing execution`, {
+            nodeId: node.id,
+            method: method?.toUpperCase() || 'UNKNOWN',
+            url: url || 'UNKNOWN_URL',
+            status: 404
+          });
+          
+          // Store the error response data and status in the execution context
+          this.executionContext.set(`${node.id}-output-response`, error.response.data || {});
+          this.executionContext.set(`${node.id}-output-body`, error.response.data || {});
+          this.executionContext.set(`${node.id}-output-status`, 404);
+          
+          // Return the error response data
+          return error.response.data || {};
         }
       }
       
