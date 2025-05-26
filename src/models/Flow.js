@@ -13,7 +13,10 @@ const FlowVersionSchema = new Schema(
     /*  Les vraies données du diagramme  */
     nodes:      { type: [Schema.Types.Mixed], default: [] },
     edges:      { type: [Schema.Types.Mixed], default: [] },
-    savedAt:    { type: Date, default: Date.now }
+    savedAt:    { type: Date, default: Date.now },
+    
+    // Métadonnées pour les subflows (facultatif)
+    subflowMetadata: { type: Schema.Types.Mixed, default: null }
   },
   { _id: false, timestamps: true }          // _id inutile dans un sous‑doc
 );

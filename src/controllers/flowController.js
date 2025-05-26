@@ -46,11 +46,32 @@ export const getFlow = async (req, res) => {
 /* -------------------------------------------------------------------------- */
 /* Sauver la variante courante                                                */
 /* PUT /flows/:id                                                              */
-/* body: { nodes, edges }                                                     */
+/* body: { nodes, edges, subflowMetadata }                                    */
 /* -------------------------------------------------------------------------- */
 export const saveVariant = async (req, res) => {
   try {
-    const flow = await flowService.saveCurrentVariant(req.params.id, req.user.id, req.body);
+    const { nodes, edges, subflowMetadata } = req.body;
+    
+    // Validation spécifique pour les SubFlowNodes
+    const subflowNodes = nodes.filter(node => node.type === 'subFlowNode');
+    for (const subflowNode of subflowNodes) {
+      // Vérifier que les données essentielles sont présentes
+      if (subflowNode.data && subflowNode.data.originals) {
+        // Validation réussie, continuer
+      } else if (subflowNode.data && subflowNode.data.isCollapsed !== undefined) {
+        // Si on a juste l'état collapsed sans les originals, c'est OK aussi
+      } else {
+        return res.status(400).json({ 
+          message: 'SubFlowNode manque de données essentielles' 
+        });
+      }
+    }
+    
+    const flow = await flowService.saveCurrentVariant(req.params.id, req.user.id, {
+      nodes,
+      edges,
+      subflowMetadata
+    });
     res.json(flow);
   } catch (e) {
     const status = e.message === 'FORBIDDEN' ? 403 : 404;

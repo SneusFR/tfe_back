@@ -21,7 +21,7 @@ const findCollabRole = async (flow, userId) => {
 };
 
 /* -------------------------------------------------------------------------- */
-/* CRUD ‑ niveau « service »                                                  */
+/* CRUD ‑ niveau « service »                                                  */
 /* -------------------------------------------------------------------------- */
 export const createFlow = async (userId, { name }) => {
   // Crée un shell à 3 variantes vides (+ index courant = 0)
@@ -63,9 +63,9 @@ export const getUserFlows = async (userId) => {
 };
 
 /* -------------------------------------------------------------------------- */
-/* Variante courante : écrasement direct                                      */
+/* Variante courante : écrasement direct                                      */
 /* -------------------------------------------------------------------------- */
-export const saveCurrentVariant = async (flowId, userId, { nodes = [], edges = [] }) => {
+export const saveCurrentVariant = async (flowId, userId, { nodes = [], edges = [], subflowMetadata = null }) => {
   const flow = await Flow.findById(flowId);
   if (!flow) throw new Error('FLOW_NOT_FOUND');
 
@@ -75,8 +75,37 @@ export const saveCurrentVariant = async (flowId, userId, { nodes = [], edges = [
     throw new Error('FORBIDDEN');
   }
 
+  // Validation des SubFlowNodes
+  const subflowNodes = nodes.filter(node => node.type === 'subFlowNode');
+  
+  // Vérifier l'intégrité des données de subflow
+  for (const subflowNode of subflowNodes) {
+    if (subflowNode.data.originals) {
+      // Valider que les nœuds originaux ont des IDs valides
+      const originalNodeIds = subflowNode.data.originals.nodes.map(n => n.id);
+      
+      // S'assurer que tous les IDs sont des chaînes non vides
+      if (originalNodeIds.some(id => !id || typeof id !== 'string')) {
+        console.warn('SubFlowNode contient des IDs de nœuds originaux invalides');
+        // On ne bloque pas la sauvegarde, mais on log l'avertissement
+      }
+    }
+    
+    // S'assurer que isCollapsed est un booléen (ou undefined)
+    if (subflowNode.data.isCollapsed !== undefined && 
+        typeof subflowNode.data.isCollapsed !== 'boolean') {
+      subflowNode.data.isCollapsed = Boolean(subflowNode.data.isCollapsed);
+    }
+  }
+
   const i = flow.currentVersionIndex;           // 0, 1 ou 2
-  flow.versions[i] = { nodes, edges, savedAt: Date.now() };
+  flow.versions[i] = { 
+    nodes, 
+    edges, 
+    savedAt: Date.now(),
+    // Si des métadonnées de subflow sont fournies, les stocker également
+    ...(subflowMetadata ? { subflowMetadata } : {})
+  };
 
   await flow.save();
   return flow.toJSON();
