@@ -250,6 +250,9 @@ class FlowExecutionEngine {
       case 'conditionalFlowNode':
         outputData = await this.executeConditionalFlowNode(node);
         break;
+      case 'base64Node':
+        outputData = await this.executeBase64Node(node);
+        break;
       default:
         flowLog.warn(`Unknown node type: ${node.type}`);
         outputData = null;
@@ -398,6 +401,11 @@ class FlowExecutionEngine {
     
   // For AI node output
   if (handleId === 'attr-output' && node.type === 'aiNode') {
+    return this.executionContext.get(`${node.id}-output`);
+  }
+  
+  // For Base64 node output
+  if (handleId === 'attr-output' && node.type === 'base64Node') {
     return this.executionContext.get(`${node.id}-output`);
   }
   
@@ -1548,6 +1556,59 @@ class FlowExecutionEngine {
       };
     } catch (error) {
       flowLog.error(`Failed to process mail body`, error, {
+        nodeId: node.id
+      });
+      
+      return { success: false, error: error.message };
+    }
+  }
+  
+  // Execute a Base64 node
+  async executeBase64Node(node) {
+    flowLog.info(`Executing Base64 node: ${node.id}`);
+    
+    try {
+      // Get the input value from the node data or from the execution context
+      const input = this.executionContext.get('attr-input') || node.data.input || '';
+      
+      // Log the input value
+      flowLog.debug(`Base64 encoding input: ${input}`, {
+        inputLength: input ? input.length : 0,
+        inputPreview: input ? (input.length > 100 ? input.substring(0, 100) + '...' : input) : null
+      });
+      
+      // Convert the input to Base64
+      let base64Output;
+      try {
+        base64Output = Buffer.from(input).toString('base64');
+      } catch (error) {
+        flowLog.error(`Error encoding to Base64: ${error.message}`, error, {
+          nodeId: node.id,
+          input: input
+        });
+        return { success: false, error: `Error encoding to Base64: ${error.message}` };
+      }
+      
+      // Log the Base64 output
+      flowLog.debug(`Base64 encoding result: ${base64Output}`, {
+        outputLength: base64Output ? base64Output.length : 0,
+        outputPreview: base64Output ? (base64Output.length > 100 ? base64Output.substring(0, 100) + '...' : base64Output) : null
+      });
+      
+      // Store the Base64 output in the execution context
+      this.executionContext.set(`${node.id}-output`, base64Output);
+      
+      // Log the successful execution
+      flowLog.info(`Base64 encoding completed successfully`, {
+        nodeId: node.id,
+        inputLength: input ? input.length : 0,
+        outputLength: base64Output ? base64Output.length : 0
+      });
+      
+      // Return the Base64 output
+      return base64Output;
+    } catch (error) {
+      flowLog.error(`Failed to execute Base64 node`, error, {
         nodeId: node.id
       });
       
