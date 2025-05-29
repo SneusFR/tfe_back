@@ -216,3 +216,31 @@ export const completeTask = async (req, res, next) => {
     next(error);
   }
 };
+
+// Marquer une tâche comme en attente (remettre une tâche complétée en état pending)
+export const setPendingTask = async (req, res, next) => {
+  try {
+    const flowId = req.params.flowId;
+    const task = await Task.findOne({ _id: req.params.id, flow: flowId });
+    
+    if (!task) {
+      throw new NotFoundError('Tâche non trouvée', 'TASK_NOT_FOUND');
+    }
+    
+    // L'accès est déjà vérifié par le middleware hasFlowAccess
+    
+    // Vérifier si la tâche est déjà en attente
+    if (task.status === 'pending') {
+      throw new ValidationError('La tâche est déjà en attente', 'TASK_ALREADY_PENDING');
+    }
+    
+    task.status = 'pending';
+    task.completedAt = null;
+    
+    const updatedTask = await task.save();
+    
+    res.json(updatedTask);
+  } catch (error) {
+    next(error);
+  }
+};

@@ -5,7 +5,8 @@ import axios from 'axios';
 import { http } from './httpLogger.js';
 import { createWorker } from 'tesseract.js';
 import flowLog from './flowLogWrapper.js';
-import { ExecutionLog } from '../models/index.js';
+import { ExecutionLog, Task } from '../models/index.js';
+import { TASK_STATUS } from '../utils/constants.js';
 
 // Create an axios instance
 const api = axios.create({
@@ -252,6 +253,9 @@ class FlowExecutionEngine {
         break;
       case 'base64Node':
         outputData = await this.executeBase64Node(node);
+        break;
+      case 'endNode':
+        outputData = await this.executeEndNode(node);
         break;
       default:
         flowLog.warn(`Unknown node type: ${node.type}`);
@@ -1609,6 +1613,84 @@ class FlowExecutionEngine {
       return base64Output;
     } catch (error) {
       flowLog.error(`Failed to execute Base64 node`, error, {
+        nodeId: node.id
+      });
+      
+      return { success: false, error: error.message };
+    }
+  }
+  
+  // Execute an end node
+  async executeEndNode(node) {
+    flowLog.info(`Executing end node: ${node.id}`);
+    
+    try {
+      // Get the task from the execution context
+      const task = this.executionContext.get('task');
+      
+      // Log the end of flow execution
+      flowLog.info(`Flow execution reached end node`, {
+        nodeId: node.id,
+        taskId: task?.id,
+        taskType: task?.type
+      });
+      
+      // Update task status to completed
+      if (task && task.id) {
+        const now = new Date();
+        try {
+          await Task.findByIdAndUpdate(
+            task.id,
+            { 
+              status: TASK_STATUS.COMPLETED,
+              completedAt: now
+            }
+          );
+          
+          flowLog.info(`Task status updated to completed`, {
+            taskId: task.id,
+            completedAt: now.toISOString()
+          });
+        } catch (updateError) {
+          flowLog.error(`Failed to update task status to completed`, updateError, {
+            taskId: task.id
+          });
+        }
+      }
+      
+      // Log to ExecutionLog
+      const flowId = task?.flow || global.__currentFlowId;
+      const taskId = task?.id;
+      
+      if (flowId && taskId) {
+        void ExecutionLog.create({
+          taskId: taskId,
+          flowId: flowId,
+          level: 'info',
+          nodeId: node.id,
+          nodeType: 'endNode',
+          message: 'Flow execution completed successfully',
+          payload: {
+            event: 'flow_execution_completed',
+            nodeId: node.id,
+            taskId: taskId,
+            taskType: task?.type,
+            taskStatusUpdated: true
+          }
+        }).catch(err => {
+          console.error('Failed to persist end node log to MongoDB:', err);
+        });
+      }
+      
+      // Return a success result
+      return { 
+        success: true, 
+        message: 'Flow execution completed successfully',
+        timestamp: new Date().toISOString(),
+        taskCompleted: true
+      };
+    } catch (error) {
+      flowLog.error(`Failed to execute end node`, error, {
         nodeId: node.id
       });
       
