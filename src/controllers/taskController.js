@@ -244,3 +244,31 @@ export const setPendingTask = async (req, res, next) => {
     next(error);
   }
 };
+
+// Marquer une tâche comme en cours
+export const setInProgressTask = async (req, res, next) => {
+  try {
+    const flowId = req.params.flowId;
+    const task = await Task.findOne({ _id: req.params.id, flow: flowId });
+    
+    if (!task) {
+      throw new NotFoundError('Tâche non trouvée', 'TASK_NOT_FOUND');
+    }
+    
+    // L'accès est déjà vérifié par le middleware hasFlowAccess
+    
+    // Vérifier si la tâche est déjà en cours
+    if (task.status === 'in_progress') {
+      throw new ValidationError('La tâche est déjà en cours', 'TASK_ALREADY_IN_PROGRESS');
+    }
+    
+    task.status = 'in_progress';
+    task.completedAt = null;
+    
+    const updatedTask = await task.save();
+    
+    res.json(updatedTask);
+  } catch (error) {
+    next(error);
+  }
+};

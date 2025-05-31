@@ -150,7 +150,7 @@ export const validateTask = (req, res, next) => {
     
     // Valider le statut si présent
     const { status } = req.body;
-    if (status && !['pending', 'completed'].includes(status)) {
+    if (status && !['pending', 'in_progress', 'completed'].includes(status)) {
       throw new ValidationError('Statut invalide', 'INVALID_TASK_STATUS');
     }
     

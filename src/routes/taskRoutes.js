@@ -53,4 +53,18 @@ router.delete('/:id', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateMongoId(
  */
 router.put('/:id/complete', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateMongoId('id'), asyncHandler(taskController.completeTask));
 
+/**
+ * @route   PUT /api/flow/:flowId/tasks/:id/in-progress
+ * @desc    Marquer une tâche comme en cours
+ * @access  Private (editor+)
+ */
+router.put('/:id/in-progress', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateMongoId('id'), asyncHandler(taskController.setInProgressTask));
+
+/**
+ * @route   PUT /api/flow/:flowId/tasks/:id/pending
+ * @desc    Marquer une tâche comme en attente
+ * @access  Private (editor+)
+ */
+router.put('/:id/pending', hasFlowAccess(COLLABORATION_ROLE.EDITOR), validateMongoId('id'), asyncHandler(taskController.setPendingTask));
+
 export default router;
