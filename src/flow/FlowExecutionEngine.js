@@ -1723,26 +1723,10 @@ class FlowExecutionEngine {
         });
         
         // Log detailed error information to ExecutionLog
-        const task = this.executionContext.get('task');
-        const flowId = task?.flow || global.__currentFlowId;
-        const taskId = task?.id;
-        
-        if (flowId && taskId) {
-          void ExecutionLog.create({
-            taskId: taskId,
-            flowId: flowId,
-            level: 'error',
-            nodeId: node.id,
-            nodeType: 'aiNode',
-            message: 'AI processing failed: Missing required parameter: prompt',
-            payload: {
-              event: 'ai_processing_error',
-              error: 'Missing required parameter: prompt'
-            }
-          }).catch(err => {
-            console.error('Failed to persist AI log to MongoDB:', err);
-          });
-        }
+        await this.persistExecError(node, error, {
+          event: 'ai_processing_error',
+          error: 'Missing required parameter: prompt'
+        });
         
         return { success: false, error: 'Missing required parameter: prompt' };
       }
@@ -1792,7 +1776,7 @@ class FlowExecutionEngine {
           },
           {
             role: "user",
-            content: input
+            content: String(input) // Force conversion to string
           }
         ],
         temperature: 0.7,
@@ -1863,42 +1847,31 @@ class FlowExecutionEngine {
       this.executionContext.set(`${node.id}-output-output`, aiResponse);
       
       return aiResponse;
-    } catch (error) {
+    } catch (err) {
       // Calculate processing time if startTime was set
       processingTimeMs = startTime ? Date.now() - startTime : 0;
       
-      flowLog.error(`Failed to process AI request`, error, {
+      const { status, data } = err.response ?? {};
+
+      /* ----------- 1️⃣  log vers tes fichiers / console ---------- */
+      flowLog.error('[AI] OpenAI request failed', err, {
         nodeId: node.id,
+        status,
+        responseBody: data,                       // << tu vois tout de suite le vrai message
         processingTimeMs: processingTimeMs
       });
-      
-      // Log error to ExecutionLog
-      const task = this.executionContext.get('task');
-      const flowId = task?.flow || global.__currentFlowId;
-      const taskId = task?.id;
-      
-      if (flowId && taskId) {
-        void ExecutionLog.create({
-          taskId: taskId,
-          flowId: flowId,
-          level: 'error',
-          nodeId: node.id,
-          nodeType: 'aiNode',
-          message: `AI processing failed: ${error.message}`,
-          payload: {
-            event: 'ai_processing_error',
-            prompt: prompt,
-            input: input,
-            error: error.message,
-            stack: error.stack,
-            processingTimeMs: processingTimeMs
-          }
-        }).catch(err => {
-          console.error('Failed to persist AI log to MongoDB:', err);
-        });
-      }
-      
-      return { success: false, error: error.message };
+
+      /* ----------- 2️⃣  persistance Mongo : ExecutionLog --------- */
+      await this.persistExecError(node, err, {
+        event: 'ai_processing_error',
+        status,
+        response: data,
+        prompt,
+        input,
+        processingTimeMs
+      });
+
+      throw err; // on propage quand même
     }
   }
 
@@ -2053,6 +2026,27 @@ class FlowExecutionEngine {
     }
   }
   
+  // Helper method to persist execution errors to MongoDB
+  async persistExecError(node, err, extra = {}) {
+    const task = this.executionContext.get('task');
+    const flowId = task?.flow || global.__currentFlowId;
+    const taskId = task?.id;
+
+    if (!flowId || !taskId) return;
+
+    await ExecutionLog.create({
+      taskId,
+      flowId,
+      level: 'error',
+      nodeId: node.id,
+      nodeType: node.type,
+      message: err.message,
+      payload: { stack: err.stack, ...extra }
+    }).catch(e =>
+      console.error('❌ Failed to persist ExecutionLog:', e)
+    );
+  }
+
   // Helper method to get HTTP status text from status code
   getHttpStatusText(statusCode) {
     const statusTexts = {

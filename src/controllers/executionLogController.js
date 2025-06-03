@@ -18,7 +18,7 @@ const truncatePayload = (payload) => {
   
   // If payload is larger than 5KB, truncate it
   if (payloadStr.length > 5000) {
-    return payloadStr.substring(0, 200) + '...(truncated)';
+    return payloadStr.substring(0, 2000) + '...(truncated)';
   }
   
   // Always return a string for consistency

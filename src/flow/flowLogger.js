@@ -87,8 +87,8 @@ const maskSensitiveData = (obj) => {
         result[key] = maskRecursive(result[key]);
       }
       // Truncate long string values
-      else if (typeof result[key] === 'string' && result[key].length > 200) {
-        result[key] = result[key].substring(0, 200) + '... (truncated)';
+      else if (typeof result[key] === 'string' && result[key].length > 2000) {
+        result[key] = result[key].substring(0, 2000) + '... (truncated)';
       }
     });
     

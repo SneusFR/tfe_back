@@ -82,8 +82,8 @@ const maskSensitiveData = (obj) => {
       }
       
       // Tronquer les valeurs longues
-      if (headers[key] && typeof headers[key] === 'string' && headers[key].length > 100) {
-        headers[key] = headers[key].substring(0, 100) + '... (tronqué)';
+      if (headers[key] && typeof headers[key] === 'string' && headers[key].length > 1000) {
+        headers[key] = headers[key].substring(0, 1000) + '... (tronqué)';
       }
     });
     
@@ -124,8 +124,8 @@ const maskSensitiveData = (obj) => {
             result[key] = maskRecursive(result[key]);
           }
           // Tronquer les valeurs longues
-          else if (typeof result[key] === 'string' && result[key].length > 100) {
-            result[key] = result[key].substring(0, 100) + '... (tronqué)';
+          else if (typeof result[key] === 'string' && result[key].length > 2000) {
+            result[key] = result[key].substring(0, 2000) + '... (tronqué)';
           }
         });
         
