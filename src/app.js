@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import fs from 'fs-extra';
+import path from 'path';
 import connectDB from './config/db.js';
 import { 
   authRoutes, 
@@ -24,6 +26,10 @@ dotenv.config();
 
 // Connecter à la base de données
 connectDB();
+
+// Assurer que le dossier uploads existe
+const uploadDir = path.join(process.cwd(), 'uploads');
+fs.ensureDirSync(uploadDir);
 
 const app = express();
 

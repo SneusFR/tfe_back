@@ -248,3 +248,25 @@ export const deleteAttachment = async (attachmentId, userId) => {
   // Supprimer la pièce jointe
   await attachment.deleteOne();
 };
+
+/**
+ * Récupère tous les emails d'un flow
+ * @param {string} flowId - ID du flow
+ * @param {string} userId - ID de l'utilisateur
+ * @param {Object} options - Options de filtrage et pagination
+ * @returns {Promise<Array>} - Liste des emails
+ */
+export const getEmailsByFlow = async (flowId, userId, options = {}) => {
+  const { limit = 100, skip = 0, sort = { date: -1 } } = options;
+  
+  const emails = await Email.find({ 
+    owner: userId,
+    flow: flowId
+  })
+    .sort(sort)
+    .skip(skip)
+    .limit(limit)
+    .populate('attachments');
+  
+  return emails;
+};

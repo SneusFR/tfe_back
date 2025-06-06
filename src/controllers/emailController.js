@@ -37,7 +37,7 @@ export const getEmailById = async (req, res) => {
 // Créer un nouvel email (généralement appelé par un service de récupération d'emails)
 export const createEmail = async (req, res) => {
   try {
-    const { emailId, subject, from, to, date, body, attachments } = req.body;
+    const { emailId, subject, from, to, date, body, attachments, flow } = req.body;
     
     // Vérifier si l'email existe déjà pour cet utilisateur
     const existingEmail = await Email.findOne({
@@ -56,7 +56,8 @@ export const createEmail = async (req, res) => {
       from,
       to,
       date: date || new Date(),
-      body
+      body,
+      flow: flow || null // Utiliser le flow fourni ou null
     });
     
     const createdEmail = await email.save();
@@ -87,7 +88,7 @@ export const createEmail = async (req, res) => {
     // Cette logique pourrait être déplacée dans un service dédié
     const task = await Task.create({
       user: req.user.id,
-      flow: req.body.flow || req.user.defaultFlow, // Utiliser le flow par défaut de l'utilisateur ou celui fourni
+      flow: flow || req.user.defaultFlow, // Utiliser le flow fourni ou le flow par défaut
       type: 'email_processing',
       description: `Traiter l'email: ${subject}`,
       source: 'email',
@@ -156,6 +157,24 @@ export const searchEmails = async (req, res) => {
         { 'from.name': { $regex: query, $options: 'i' } }
       ]
     }).sort({ date: -1 }).populate('attachments');
+    
+    res.json(emails);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Récupérer tous les emails d'un flow
+export const getEmailsByFlow = async (req, res) => {
+  try {
+    const flowId = req.params.flowId;
+    
+    const emails = await Email.find({ 
+      owner: req.user.id,
+      flow: flowId
+    })
+      .sort({ date: -1 })
+      .populate('attachments');
     
     res.json(emails);
   } catch (error) {

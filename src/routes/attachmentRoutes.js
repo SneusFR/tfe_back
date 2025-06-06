@@ -1,10 +1,21 @@
 import express from 'express';
 import { attachmentController } from '../controllers/index.js';
-import { authMiddleware, errorMiddleware } from '../middleware/index.js';
+import { authMiddleware, errorMiddleware, uploadMiddleware } from '../middleware/index.js';
 
 const router = express.Router();
 const { protect } = authMiddleware;
 const { asyncHandler, validateMongoId } = errorMiddleware;
+
+/**
+ * @route   GET /api/attachments/flow/:flowId
+ * @desc    Récupérer toutes les pièces jointes d'un flow
+ * @access  Private
+ */
+router.get('/flow/:flowId', 
+  protect, 
+  validateMongoId('flowId'), 
+  asyncHandler(attachmentController.getAttachmentsByFlow)
+);
 
 /**
  * @route   GET /api/attachments/email/:emailId
@@ -48,6 +59,17 @@ router.delete('/:id',
   protect, 
   validateMongoId('id'), 
   asyncHandler(attachmentController.deleteAttachment)
+);
+
+/**
+ * @route   POST /api/attachments/upload
+ * @desc    Télécharger un fichier en tant que pièce jointe
+ * @access  Private
+ */
+router.post('/upload', 
+  protect, 
+  uploadMiddleware.single('file'), 
+  asyncHandler(attachmentController.uploadAttachment)
 );
 
 export default router;

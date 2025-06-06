@@ -9,7 +9,8 @@ const EmailSchema = new Schema({
   to:           [{ address: String, name: String }],
   date:         Date,
   body:         String,
-  attachments:  [{ type: Schema.Types.ObjectId, ref: 'Attachment' }]
+  attachments:  [{ type: Schema.Types.ObjectId, ref: 'Attachment' }],
+  flow:         { type: Schema.Types.ObjectId, ref: 'Flow', required: false }
 }, {
   timestamps: true
 });

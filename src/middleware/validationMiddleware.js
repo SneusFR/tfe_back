@@ -1,5 +1,6 @@
 import { ValidationError } from '../utils/AppError.js';
 import { validationResult } from 'express-validator';
+import mongoose from 'mongoose';
 
 /**
  * Middleware pour gérer les erreurs de validation d'express-validator
@@ -174,7 +175,7 @@ export const validateTask = (req, res, next) => {
  */
 export const validateEmail = (req, res, next) => {
   try {
-    const { emailId, subject, from } = req.body;
+    const { emailId, subject, from, flow } = req.body;
     
     if (!emailId) {
       throw new ValidationError('ID d\'email requis', 'MISSING_EMAIL_ID');
@@ -186,6 +187,11 @@ export const validateEmail = (req, res, next) => {
     
     if (!from || !from.address) {
       throw new ValidationError('Adresse d\'expéditeur requise', 'MISSING_EMAIL_SENDER');
+    }
+    
+    // Valider le flow si présent (optionnel)
+    if (flow && !mongoose.Types.ObjectId.isValid(flow)) {
+      throw new ValidationError('ID de flow invalide', 'INVALID_FLOW_ID');
     }
     
     next();

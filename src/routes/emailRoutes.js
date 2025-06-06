@@ -22,6 +22,13 @@ router.get('/', protect, validatePagination, asyncHandler(emailController.getEma
 router.get('/search', protect, validateSearch, validatePagination, asyncHandler(emailController.searchEmails));
 
 /**
+ * @route   GET /api/emails/flow/:flowId
+ * @desc    Récupérer tous les emails d'un flow
+ * @access  Private
+ */
+router.get('/flow/:flowId', protect, validateMongoId('flowId'), asyncHandler(emailController.getEmailsByFlow));
+
+/**
  * @route   GET /api/emails/:id
  * @desc    Récupérer un email par ID
  * @access  Private
