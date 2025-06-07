@@ -1,4 +1,4 @@
-import { Email, Attachment, Task } from '../models/index.js';
+import { Email, Attachment } from '../models/index.js';
 
 // Récupérer tous les emails d'un utilisateur
 export const getEmails = async (req, res) => {
@@ -84,24 +84,7 @@ export const createEmail = async (req, res) => {
       await createdEmail.save();
     }
     
-    // Créer automatiquement une tâche associée à cet email si nécessaire
-    // Cette logique pourrait être déplacée dans un service dédié
-    const task = await Task.create({
-      user: req.user.id,
-      flow: flow || req.user.defaultFlow, // Utiliser le flow fourni ou le flow par défaut
-      type: 'email_processing',
-      description: `Traiter l'email: ${subject}`,
-      source: 'email',
-      sourceId: createdEmail._id.toString(),
-      attachments: attachments ? attachments.map(a => ({
-        id: a.storageKey,
-        name: a.name,
-        mime: a.mime,
-        size: a.size
-      })) : []
-    });
-    
-    // Task.create() sauvegarde déjà la tâche, pas besoin de save() supplémentaire
+    // La création automatique de tâche email_processing a été supprimée
     
     // Récupérer l'email avec les pièces jointes pour la réponse
     const emailWithAttachments = await Email.findById(createdEmail._id)

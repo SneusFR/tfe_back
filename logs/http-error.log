@@ -133,3 +133,7 @@
 {"level":"error","message":{"error":{"code":"ECONNREFUSED","message":""},"method":"GET","responseTime":10,"type":"error","url":"http://localhost:5171/api/User/GetUserIdByEmail"},"timestamp":"2025-06-06T00:25:47.537Z"}
 {"level":"error","message":{"error":{"code":"ECONNREFUSED","message":""},"method":"GET","responseTime":12,"type":"error","url":"http://localhost:5171/api/User/GetUserIdByEmail"},"timestamp":"2025-06-06T00:25:47.539Z"}
 {"level":"error","message":{"error":{"code":"ECONNREFUSED","message":""},"method":"GET","responseTime":13,"type":"error","url":"http://localhost:5171/api/User/GetUserIdByEmail"},"timestamp":"2025-06-06T00:25:47.540Z"}
+{"level":"error","message":{"error":{"code":"ECONNREFUSED","message":""},"method":"GET","responseTime":5,"type":"error","url":"http://localhost:5171/api/User/GetUserIdByEmail"},"timestamp":"2025-06-06T00:53:33.810Z"}
+{"level":"error","message":{"error":{"code":"ECONNREFUSED","message":""},"method":"GET","responseTime":8,"type":"error","url":"http://localhost:5171/api/User/GetUserIdByEmail"},"timestamp":"2025-06-06T00:53:33.813Z"}
+{"level":"error","message":{"error":{"code":"ECONNREFUSED","message":""},"method":"GET","responseTime":9,"type":"error","url":"http://localhost:5171/api/User/GetUserIdByEmail"},"timestamp":"2025-06-06T00:53:33.814Z"}
+{"level":"error","message":{"error":{"code":"ECONNREFUSED","message":""},"method":"GET","responseTime":9,"type":"error","url":"http://localhost:5171/api/User/GetUserIdByEmail"},"timestamp":"2025-06-06T00:53:33.815Z"}

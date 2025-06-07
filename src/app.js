@@ -16,7 +16,8 @@ import {
   emailRoutes, 
   attachmentRoutes,
   backendConfigRoutes,
-  executionLogRoutes
+  executionLogRoutes,
+  metricsRoutes
 } from './routes/index.js';
 import flowExecRoutes from './routes/flowExecRoutes.js';
 import { errorMiddleware } from './middleware/index.js';
@@ -71,6 +72,7 @@ app.use('/api/emails', emailRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/flow', flowExecRoutes);
 app.use('/api/executions', executionLogRoutes);
+app.use('/api/metrics', metricsRoutes);
 
 // Note: Les routes pour tasks, conditions et backend-configs sont maintenant
 // imbriquées sous /api/flows/:flowId/ via le routeur de flow

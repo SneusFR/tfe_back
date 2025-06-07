@@ -7,6 +7,7 @@ import * as emailController from './emailController.js';
 import * as attachmentController from './attachmentController.js';
 import * as backendConfigController from './backendConfigController.js';
 import * as executionLogController from './executionLogController.js';
+import * as metricsController from './metricsController.js';
 
 export {
   userController,
@@ -17,5 +18,6 @@ export {
   emailController,
   attachmentController,
   backendConfigController,
-  executionLogController
+  executionLogController,
+  metricsController
 };

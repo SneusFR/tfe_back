@@ -5,7 +5,7 @@ import axios from 'axios';
 import { http } from './httpLogger.js';
 import { createWorker } from 'tesseract.js';
 import flowLog from './flowLogWrapper.js';
-import { ExecutionLog, Task } from '../models/index.js';
+import { ExecutionLog, Task, ExecutionMetrics } from '../models/index.js';
 import { TASK_STATUS } from '../utils/constants.js';
 
 // Create an axios instance
@@ -14,12 +14,15 @@ const api = axios.create({
 });
 
 class FlowExecutionEngine {
-  constructor() {
+constructor() {
     this.nodes = [];
     this.edges = [];
     this.executionContext = new Map(); // Stores data during execution
     this.baseApiUrl = 'http://localhost:5171'; // Backend API base URL
     this.backendConfig = null;
+    this.nodeExecutionTimes = new Map(); // Store execution times for each node
+    this.executionStartTime = null; // Track overall execution time
+    this.executionId = null; // Unique ID for each execution
     
     // Make execution context available globally for logging
     global.__executionContext = this.executionContext;
@@ -28,6 +31,11 @@ class FlowExecutionEngine {
       baseApiUrl: this.baseApiUrl,
       timestamp: new Date().toISOString()
     });
+  }
+
+  // Generate a unique execution ID
+  generateExecutionId() {
+    return `exec-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
   }
 
   // Set the diagram data (nodes and edges)
@@ -97,6 +105,15 @@ class FlowExecutionEngine {
 
   // Execute a flow for a given task
   async executeFlow(task) {
+    // Generate a unique execution ID
+    this.executionId = this.generateExecutionId();
+    
+    // Record the start time of the execution
+    this.executionStartTime = Date.now();
+    
+    // Clear previous execution times
+    this.nodeExecutionTimes.clear();
+    
     // Store the task in the execution context
     this.executionContext.set('task', task);
     
@@ -205,9 +222,22 @@ class FlowExecutionEngine {
     // Execute the flow starting from the starting node
     try {
       const result = await this.executeNode(startingNode);
+      
+      // Calculate total execution time
+      const executionTime = Date.now() - this.executionStartTime;
+      
+      // Store metrics data
+      await this.storeExecutionMetrics(task, executionTime, true);
+      
       flowLog.endExecution(task.id, true, result);
       return { success: true, result };
     } catch (error) {
+      // Calculate total execution time even for failed executions
+      const executionTime = Date.now() - this.executionStartTime;
+      
+      // Store metrics data for failed execution
+      await this.storeExecutionMetrics(task, executionTime, false, error.message);
+      
       flowLog.endExecution(task.id, false, { error: error.message });
       return { success: false, error: error.message };
     }
@@ -215,6 +245,9 @@ class FlowExecutionEngine {
 
   // Execute a single node and follow its outgoing edges
   async executeNode(node) {
+    // Record the start time for this node
+    const nodeStartTime = Date.now();
+    
     flowLog.startNodeExecution(node.id, node.type);
     
     let outputData;
@@ -359,6 +392,18 @@ class FlowExecutionEngine {
         }
       }
     }
+    
+    // After node execution is complete, store the execution time
+    const nodeExecutionTime = Date.now() - nodeStartTime;
+    
+    // Store the node execution time
+    this.nodeExecutionTimes.set(node.id, {
+      nodeId: node.id,
+      nodeType: node.type,
+      label: node.data?.label || node.type,
+      executionTime: nodeExecutionTime,
+      success: true // Assume success by default, can be updated if there's an error
+    });
     
     flowLog.endNodeExecution(node.id, node.type, outputData);
     return results.length > 0 ? results : outputData;
@@ -2045,6 +2090,43 @@ class FlowExecutionEngine {
     }).catch(e =>
       console.error('❌ Failed to persist ExecutionLog:', e)
     );
+  }
+
+  // Store execution metrics in the database
+  async storeExecutionMetrics(task, executionTime, success, errorMessage = null) {
+    try {
+      // Convert the node execution times map to an array
+      const nodeMetrics = Array.from(this.nodeExecutionTimes.values());
+      
+      // Create the execution metrics object
+      const executionMetricsData = {
+        id: this.executionId,
+        flowId: task.flow,
+        taskId: task.id,
+        taskType: task.type,
+        timestamp: new Date(),
+        executionTime,
+        success,
+        errorMessage,
+        nodeMetrics
+      };
+      
+      // Log the metrics
+      flowLog.info(`Execution metrics for flow ${task.flow}`, {
+        executionId: this.executionId,
+        executionTime,
+        success,
+        nodeCount: nodeMetrics.length
+      });
+      
+      // Store the metrics in the database using the ExecutionMetrics model
+      await ExecutionMetrics.create(executionMetricsData);
+      
+      return executionMetricsData;
+    } catch (error) {
+      flowLog.error(`Failed to store execution metrics`, error);
+      return null;
+    }
   }
 
   // Helper method to get HTTP status text from status code

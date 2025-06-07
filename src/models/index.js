@@ -7,6 +7,7 @@ import Email from './Email.js';
 import Attachment from './Attachment.js';
 import BackendConfig from './BackendConfig.js';
 import ExecutionLog from './ExecutionLog.js';
+import ExecutionMetrics from './ExecutionMetrics.js';
 
 export {
   User,
@@ -17,5 +18,6 @@ export {
   Email,
   Attachment,
   BackendConfig,
-  ExecutionLog
+  ExecutionLog,
+  ExecutionMetrics
 };

@@ -8,6 +8,7 @@ import emailRoutes from './emailRoutes.js';
 import attachmentRoutes from './attachmentRoutes.js';
 import backendConfigRoutes from './backendConfigRoutes.js';
 import executionLogRoutes from './executionLogRoutes.js';
+import metricsRoutes from './metricsRoutes.js';
 
 export {
   authRoutes,
@@ -19,5 +20,6 @@ export {
   emailRoutes,
   attachmentRoutes,
   backendConfigRoutes,
-  executionLogRoutes
+  executionLogRoutes,
+  metricsRoutes
 };
