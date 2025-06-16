@@ -1023,6 +1023,42 @@ constructor() {
       const bcc = this.executionContext.get('attr-bcc') || emailAttributes.bcc;
       const custom_headers = this.executionContext.get('attr-custom_headers') || emailAttributes.custom_headers;
       
+      // Collect all input data for logging
+      const inputData = {
+        fromEmail,
+        fromDisplayName,
+        toEmail,
+        toDisplayName,
+        subject: subject ? (subject.length > 50 ? subject.substring(0, 50) + '...' : subject) : null,
+        body: body ? (typeof body === 'string' ? (body.length > 100 ? body.substring(0, 100) + '...' : body) : 'Complex body object') : null,
+        reply_to,
+        hasCC: cc && cc.length > 0,
+        hasBCC: bcc && bcc.length > 0,
+        hasCustomHeaders: custom_headers && custom_headers.length > 0
+      };
+      
+      // Log the input data to execution logs
+      const task = this.executionContext.get('task');
+      const flowId = task?.flow || global.__currentFlowId;
+      const taskId = task?.id;
+      
+      if (flowId && taskId) {
+        void ExecutionLog.create({
+          taskId: taskId,
+          flowId: flowId,
+          level: 'info',
+          nodeId: node.id,
+          nodeType: 'sendingMailNode',
+          message: 'Email sending node input data',
+          payload: {
+            event: 'email_sending_input',
+            inputData
+          }
+        }).catch(err => {
+          console.error('Failed to persist email input log to MongoDB:', err);
+        });
+      }
+      
       flowLog.debug(`Email details`, {
         toEmail,
         fromEmail,
